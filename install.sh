@@ -7,18 +7,21 @@
 # overwrites the installed adapter in place.
 #
 # Usage:
-#   ./install.sh --agent claude [--local]
+#   ./install.sh --agent claude [--local] [--with-binary]
 #
-#   --agent   claude | codex | opencode | copilot   (v1 implements: claude)
-#   --local   install into ./.claude/skills/ instead of ~/.claude/skills/
+#   --agent        claude | codex | opencode | copilot   (v1 implements: claude)
+#   --local        install into ./.claude/skills/ instead of ~/.claude/skills/
+#   --with-binary  eagerly fetch the server binary now, instead of waiting for
+#                  first use (ensure-server.sh fetches it lazily either way)
 
 set -eu
 
 AGENT=""
 LOCAL=0
+WITH_BINARY=0
 
 usage() {
-	echo "usage: ./install.sh --agent claude|codex|opencode|copilot [--local]" >&2
+	echo "usage: ./install.sh --agent claude|codex|opencode|copilot [--local] [--with-binary]" >&2
 }
 
 while [ $# -gt 0 ]; do
@@ -33,6 +36,9 @@ while [ $# -gt 0 ]; do
 		;;
 	--local)
 		LOCAL=1
+		;;
+	--with-binary)
+		WITH_BINARY=1
 		;;
 	-h | --help)
 		usage
@@ -91,13 +97,27 @@ fi
 TARGET="$SKILLS_ROOT/html-artifacts"
 
 mkdir -p "$TARGET"
-# Copy the thin adapter, the canonical CORE.md it defers to, and the templates
-# (base.html + vendored mermaid.min.js) the agent needs at runtime. Overwriting
-# in place keeps re-runs idempotent; rm -rf the templates dir first so removed
-# files don't linger across updates.
+# Copy the thin adapter, the canonical CORE.md it defers to, the
+# ensure-server.sh bootstrap script CORE.md shells out to, and the base.html
+# template authoring needs. Mermaid is embedded in the server binary now (not
+# copied here) — ensure-server.sh fetches that binary lazily on first use.
+# Overwriting in place keeps re-runs idempotent.
 cp "$ADAPTER_DIR/SKILL.md" "$TARGET/SKILL.md"
 cp "$CORE" "$TARGET/CORE.md"
-rm -rf "$TARGET/templates"
-cp -R "$REPO_ROOT/instructions/templates" "$TARGET/templates"
+cp "$REPO_ROOT/scripts/ensure-server.sh" "$TARGET/ensure-server.sh"
+chmod +x "$TARGET/ensure-server.sh"
+mkdir -p "$TARGET/templates"
+cp "$REPO_ROOT/instructions/templates/base.html" "$TARGET/templates/base.html"
 
 echo "installed html-artifacts adapter for '$AGENT' -> $TARGET"
+
+if [ "$WITH_BINARY" -eq 1 ]; then
+	echo "fetching server binary now (--with-binary)..."
+	if HTML_ARTIFACTS_HOME="$HOME/.html-artifacts" "$REPO_ROOT/scripts/ensure-server.sh" >/dev/null; then
+		echo "server binary ready."
+	else
+		echo "warning: failed to fetch the server binary; it will be fetched on first use instead." >&2
+	fi
+else
+	echo "note: the server binary is fetched automatically on first use (run with --with-binary to fetch it now)."
+fi

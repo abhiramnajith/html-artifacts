@@ -34,13 +34,13 @@ You do not need to be asked for "an artifact" or "HTML"; the trigger is the
 Write **one** file:
 
 ```
-~/.html-artifacts/artifacts/<id>.html
+~/.vellum/artifacts/<id>.html
 ```
 
-- Create the `~/.html-artifacts/artifacts/` directory if it does not exist.
+- Create the `~/.vellum/artifacts/` directory if it does not exist.
 - This is the global artifact store. The viewer serves
-  `~/.html-artifacts/artifacts/` by default (see §5), so `/view/<id>` finds
-  the file there. Set the `HTML_ARTIFACTS_DIR` environment variable to change
+  `~/.vellum/artifacts/` by default (see §5), so `/view/<id>` finds
+  the file there. Set the `VELLUM_DIR` environment variable to change
   where artifacts live — `ensure-server.sh` (which starts the viewer) and the
   `render` subcommand (§7) both honor it, so set it consistently in the
   environment rather than passing it to only one of them.
@@ -63,7 +63,7 @@ Write **one** file:
 
 Example: a "React vs Vue" comparison made at 10:30:00 →
 `react-vs-vue-20260721-103000`, written to
-`~/.html-artifacts/artifacts/react-vs-vue-20260721-103000.html`.
+`~/.vellum/artifacts/react-vs-vue-20260721-103000.html`.
 
 Get the timestamp from the shell, e.g. `date +%Y%m%d-%H%M%S`.
 
@@ -152,12 +152,12 @@ Then open `$URL` cross-platform:
 - **Windows:** `start "" "$URL"`
 
 If the script fails (nonzero exit — no binary available and no network/Go to
-fetch one), fall back to opening `~/.html-artifacts/artifacts/<id>.html`
-directly instead, e.g. `open "$HOME/.html-artifacts/artifacts/<id>.html"`, and
+fetch one), fall back to opening `~/.vellum/artifacts/<id>.html`
+directly instead, e.g. `open "$HOME/.vellum/artifacts/<id>.html"`, and
 note to the user that Mermaid diagrams won't render in that fallback (§4).
 
 Artifacts are written to (§2) and served from the same global store,
-`~/.html-artifacts/artifacts` (override via `HTML_ARTIFACTS_DIR`, matching the
+`~/.vellum/artifacts` (override via `VELLUM_DIR`, matching the
 server/`ensure-server.sh` default) — the viewer lists whatever is in that
 directory, across all projects, not just the current one's output.
 
@@ -170,7 +170,7 @@ you built.
 
 The viewer's editor lets the user attach comments to elements or text ranges and
 "Send to agent". Each send writes
-`~/.html-artifacts/artifacts/<id>.annotations.json` (schema below). When the
+`~/.vellum/artifacts/<id>.annotations.json` (schema below). When the
 user says something like "apply annotations for `<id>`" (or "check
 annotations"), read that file and revise the artifact.
 
@@ -202,7 +202,7 @@ For each annotation:
    to make** — e.g. "add a row comparing bundle size", "tighten this wording",
    "flag this as deprecated". Make that change to the located element using the
    template's primitives, then rewrite
-   `~/.html-artifacts/artifacts/<id>.html`. Nothing to re-inline: the viewer
+   `~/.vellum/artifacts/<id>.html`. Nothing to re-inline: the viewer
    injects the Mermaid runtime and init (§4) at view-time if the result still
    has diagrams.
 
@@ -229,11 +229,11 @@ README, or other doc — into a viewable, annotatable artifact, use the `render`
 subcommand of the bootstrapped binary instead of hand-filling the template.
 
 The binary is not reliably on `PATH`: `ensure-server.sh` (§5) installs it at
-`~/.html-artifacts/bin/html-artifacts`, and the `go install` fallback names it
+`~/.vellum/bin/vellum`, and the `go install` fallback names it
 `server`. Resolve the bootstrapped binary and invoke it directly:
 
 ```sh
-BIN="$(command -v html-artifacts || echo "$HOME/.html-artifacts/bin/html-artifacts")"
+BIN="$(command -v vellum || echo "$HOME/.vellum/bin/vellum")"
 "$BIN" render --title "My Doc" path/to/file.md
 ```
 
@@ -247,9 +247,9 @@ This converts the file's Markdown to HTML with a small dependency-free
 renderer (headings, bold, inline code, fenced code blocks, GFM tables,
 ordered/unordered/task lists, blockquotes, links, horizontal rules — all
 HTML-escaped), wraps it in the same `base.html` template used for authored
-artifacts, writes it into the artifacts store (`~/.html-artifacts/artifacts`
-by default, same as §5 — also honoring `HTML_ARTIFACTS_DIR`/
-`HTML_ARTIFACTS_HOME` if set, see §2), and prints the resulting `/view/<id>`
+artifacts, writes it into the artifacts store (`~/.vellum/artifacts`
+by default, same as §5 — also honoring `VELLUM_DIR`/
+`VELLUM_HOME` if set, see §2), and prints the resulting `/view/<id>`
 URL (or a reminder to start the server if it isn't running). Opening that URL
 requires the viewer to already be running (start it via `ensure-server.sh`,
 §5); open it as in §5 — the file behaves like any other artifact from then

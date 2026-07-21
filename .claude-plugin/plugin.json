@@ -1,8 +1,8 @@
 {
-  "name": "html-artifacts",
+  "name": "vellum",
   "version": "0.1.0",
   "description": "Emit rich, self-contained HTML artifacts (comparisons, plans, diagrams, reports) and annotate them in a local viewer.",
   "author": { "name": "abhiramnajith" },
-  "homepage": "https://github.com/abhiramnajith/html-artifacts",
+  "homepage": "https://github.com/abhiramnajith/vellum",
   "license": "MIT"
 }

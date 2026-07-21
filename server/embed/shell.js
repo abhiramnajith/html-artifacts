@@ -1,4 +1,4 @@
-// html-artifacts editor shell.
+// vellum editor shell.
 //
 // Injected by the server into every /view/<id> page. Lets you annotate the
 // artifact — pick an element or select text, attach a comment — and send the

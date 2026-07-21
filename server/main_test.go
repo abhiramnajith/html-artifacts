@@ -9,8 +9,8 @@ import (
 
 func TestDefaultArtifactsDirUnderHome(t *testing.T) {
 	got := defaultArtifactsDir()
-	if !strings.HasSuffix(filepath.ToSlash(got), ".html-artifacts/artifacts") {
-		t.Fatalf("defaultArtifactsDir = %q, want it to end with .html-artifacts/artifacts", got)
+	if !strings.HasSuffix(filepath.ToSlash(got), ".vellum/artifacts") {
+		t.Fatalf("defaultArtifactsDir = %q, want it to end with .vellum/artifacts", got)
 	}
 }
 
@@ -35,14 +35,14 @@ func TestRenderCmdWritesArtifact(t *testing.T) {
 
 func TestRenderCmdHonorsEnvDir(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HTML_ARTIFACTS_DIR", dir)
+	t.Setenv("VELLUM_DIR", dir)
 	md := filepath.Join(t.TempDir(), "n.md")
 	os.WriteFile(md, []byte("# hi\n"), 0o644)
 	if err := renderCmd([]string{md}); err != nil {
 		t.Fatal(err)
 	}
 	if m, _ := filepath.Glob(filepath.Join(dir, "*.html")); len(m) != 1 {
-		t.Fatalf("render did not honor HTML_ARTIFACTS_DIR, files: %v", m)
+		t.Fatalf("render did not honor VELLUM_DIR, files: %v", m)
 	}
 }
 

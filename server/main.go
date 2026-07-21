@@ -1,4 +1,4 @@
-// Command html-artifacts serves self-contained HTML artifacts and their
+// Command vellum serves self-contained HTML artifacts and their
 // annotations from a local directory, bound to 127.0.0.1 only.
 package main
 
@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	assets "github.com/abhiramnajith/html-artifacts/server/embed"
-	markdown "github.com/abhiramnajith/html-artifacts/server/internal/markdown"
-	"github.com/abhiramnajith/html-artifacts/server/internal/server"
-	"github.com/abhiramnajith/html-artifacts/server/internal/storage"
+	assets "github.com/abhiramnajith/vellum/server/embed"
+	markdown "github.com/abhiramnajith/vellum/server/internal/markdown"
+	"github.com/abhiramnajith/vellum/server/internal/server"
+	"github.com/abhiramnajith/vellum/server/internal/storage"
 )
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "html-artifacts:", err)
+		fmt.Fprintln(os.Stderr, "vellum:", err)
 		os.Exit(1)
 	}
 }
@@ -73,7 +73,7 @@ func serve(args []string) error {
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	fmt.Printf("html-artifacts serving %s at http://%s/artifacts\n", *dir, addr)
+	fmt.Printf("vellum serving %s at http://%s/artifacts\n", *dir, addr)
 	if err := httpSrv.Serve(ln); err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}
@@ -85,25 +85,25 @@ func defaultArtifactsDir() string {
 	if err != nil {
 		return "./artifacts"
 	}
-	return filepath.Join(home, ".html-artifacts", "artifacts")
+	return filepath.Join(home, ".vellum", "artifacts")
 }
 
 // haHome mirrors ensure-server.sh's HA_HOME resolution:
-// ${HTML_ARTIFACTS_HOME:-~/.html-artifacts}
+// ${VELLUM_HOME:-~/.vellum}
 func haHome() string {
-	if h := os.Getenv("HTML_ARTIFACTS_HOME"); h != "" {
+	if h := os.Getenv("VELLUM_HOME"); h != "" {
 		return h
 	}
 	if h, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(h, ".html-artifacts")
+		return filepath.Join(h, ".vellum")
 	}
-	return ".html-artifacts"
+	return ".vellum"
 }
 
 // renderDefaultDir mirrors ensure-server.sh's DIR resolution:
-// ${HTML_ARTIFACTS_DIR:-$HA_HOME/artifacts}
+// ${VELLUM_DIR:-$HA_HOME/artifacts}
 func renderDefaultDir() string {
-	if d := os.Getenv("HTML_ARTIFACTS_DIR"); d != "" {
+	if d := os.Getenv("VELLUM_DIR"); d != "" {
 		return d
 	}
 	return filepath.Join(haHome(), "artifacts")
@@ -124,7 +124,7 @@ func renderCmd(args []string) error {
 		return err
 	}
 	if fs.NArg() < 1 {
-		return fmt.Errorf("usage: html-artifacts render <path.md> [--title T] [--dir D] [--id ID]")
+		return fmt.Errorf("usage: vellum render <path.md> [--title T] [--dir D] [--id ID]")
 	}
 	path := fs.Arg(0)
 	md, err := os.ReadFile(path)
@@ -178,6 +178,6 @@ func renderCmd(args []string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: html-artifacts serve [--port N] [--dir PATH]")
-	fmt.Fprintln(os.Stderr, "       html-artifacts render <path.md> [--title T] [--dir D] [--id ID]")
+	fmt.Fprintln(os.Stderr, "usage: vellum serve [--port N] [--dir PATH]")
+	fmt.Fprintln(os.Stderr, "       vellum render <path.md> [--title T] [--dir D] [--id ID]")
 }

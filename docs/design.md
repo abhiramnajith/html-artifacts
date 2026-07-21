@@ -12,7 +12,7 @@ Distributed as a **GitHub repo** so it can be installed on any machine (leodesti
 - **Go for the server** (stdlib `net/http`, no framework), vanilla JS for the viewer — no heavy frontend framework.
 - Single static binary; editor JS and HTML template bundled via `go:embed` — zero runtime dependencies on target machines.
 - Server binds to `127.0.0.1` only (no auth, must never be network-reachable).
-- Installable via a single script; skill lands in `~/.claude/skills/html-artifacts/` (global) or `.claude/skills/` (project-local) via a flag.
+- Installable via a single script; skill lands in `~/.claude/skills/vellum/` (global) or `.claude/skills/` (project-local) via a flag.
 - Follow AGENTS.md conventions: idiomatic Go error handling, no unnecessary interfaces, `go vet` + `go test` clean.
 
 ## Invariants (must hold in every phase)
@@ -35,7 +35,7 @@ These consolidate the rules scattered through this doc into one always-on checkl
 
 ## Repo structure
 ```
-html-artifacts/                  # GitHub repo root
+vellum/                  # GitHub repo root
 ├── README.md                    # what it is, install, usage, screenshots
 ├── LICENSE                      # MIT
 ├── install.sh                   # installs adapter for chosen agent: --agent claude|codex|opencode|copilot, --local flag
@@ -71,8 +71,8 @@ html-artifacts/                  # GitHub repo root
 - v1 ships the Claude Code adapter only; the adapter directory structure proves the pattern. Other adapters are added as needed (each should be <1 hour of work if the pattern holds).
 
 ## Distribution / install flow
-- **Primary**: `go install github.com/<user>/html-artifacts/server@latest` — or download a prebuilt binary from GitHub Releases (CI builds linux/amd64 + linux/arm64 + darwin on tag)
-- Adapter install: `git clone` + `./install.sh --agent claude` copies the Claude Code adapter (with CORE.md inlined or referenced) into `~/.claude/skills/html-artifacts/`; other agents via their flag once adapters exist; updates via `git pull` + re-run
+- **Primary**: `go install github.com/<user>/vellum/server@latest` — or download a prebuilt binary from GitHub Releases (CI builds linux/amd64 + linux/arm64 + darwin on tag)
+- Adapter install: `git clone` + `./install.sh --agent claude` copies the Claude Code adapter (with CORE.md inlined or referenced) into `~/.claude/skills/vellum/`; other agents via their flag once adapters exist; updates via `git pull` + re-run
 - Version pinning: tag releases (`v0.1.0`, ...) so a known-good version can be installed on work machines
 - `install.sh` must be readable and dumb — no curl-pipe-bash pattern, no network calls beyond git itself (the same standard I'd apply when auditing any third-party skill)
 
@@ -88,7 +88,7 @@ html-artifacts/                  # GitHub repo root
 - `adapters/claude-code/SKILL.md` — frontmatter + auto-invocation description tuned for Claude Code's pattern-matching, body defers to CORE.md content
 
 ### 2. Local Viewer/Server (Go, stdlib net/http)
-- Single binary, run as a background process (systemd user unit or `html-artifacts serve` on demand)
+- Single binary, run as a background process (systemd user unit or `vellum serve` on demand)
 - Binds `127.0.0.1` only; port configurable via flag (default e.g. 7777)
 - Endpoints:
   - `GET /view/{slug}` — serves the artifact HTML wrapped in an editor shell

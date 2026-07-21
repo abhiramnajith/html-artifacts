@@ -1,3 +1,3 @@
-module github.com/abhiramnajith/html-artifacts/server
+module github.com/abhiramnajith/vellum/server
 
 go 1.23

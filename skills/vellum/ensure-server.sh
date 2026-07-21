@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Ensure the html-artifacts viewer is running; print its base URL on stdout.
+# Ensure the vellum viewer is running; print its base URL on stdout.
 # Bootstraps the binary (PATH -> local -> GitHub release -> go install) and
 # starts the server on a free port, recording it for the skill.
 set -euo pipefail
 
-REPO="abhiramnajith/html-artifacts"
-HA_HOME="${HTML_ARTIFACTS_HOME:-$HOME/.html-artifacts}"
+REPO="abhiramnajith/vellum"
+HA_HOME="${VELLUM_HOME:-$HOME/.vellum}"
 BIN_DIR="$HA_HOME/bin"
-BIN="$BIN_DIR/html-artifacts"
+BIN="$BIN_DIR/vellum"
 PORT_FILE="$HA_HOME/port"
-DIR="${HTML_ARTIFACTS_DIR:-$HA_HOME/artifacts}"
-START_PORT="${HTML_ARTIFACTS_PORT:-47600}"
+DIR="${VELLUM_DIR:-$HA_HOME/artifacts}"
+START_PORT="${VELLUM_PORT:-47600}"
 mkdir -p "$BIN_DIR" "$DIR"
 chmod 700 "$HA_HOME" 2>/dev/null || true  # Finding 4: keep the global store private to this user
 
@@ -32,7 +32,7 @@ fi
 
 # 2. Ensure a binary.
 resolve_bin() {
-  if command -v html-artifacts >/dev/null 2>&1; then echo "$(command -v html-artifacts)"; return; fi
+  if command -v vellum >/dev/null 2>&1; then echo "$(command -v vellum)"; return; fi
   if [ -x "$BIN" ]; then echo "$BIN"; return; fi
   echo ""
 }
@@ -41,7 +41,7 @@ if [ -z "$BIN_PATH" ]; then
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
   arch="$(uname -m)"
   case "$arch" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; esac
-  asset="html-artifacts-${os}-${arch}"
+  asset="vellum-${os}-${arch}"
   base="https://github.com/$REPO/releases/latest/download"
   if curl -fsSL "$base/$asset" -o "$BIN.tmp" 2>/dev/null \
      && curl -fsSL "$base/SHA256SUMS" -o "$HA_HOME/SHA256SUMS.tmp" 2>/dev/null; then
@@ -63,7 +63,7 @@ if [ -z "$BIN_PATH" ] && command -v go >/dev/null 2>&1; then
   [ -x "$gobin/server" ] && BIN_PATH="$gobin/server"
 fi
 if [ -z "$BIN_PATH" ]; then
-  echo "html-artifacts: no binary found and no download/go available." >&2
+  echo "vellum: no binary found and no download/go available." >&2
   echo "Install Go, or download a release from https://github.com/$REPO/releases" >&2
   exit 1
 fi
@@ -82,5 +82,5 @@ for _ in $(seq 1 50); do
   server_up "$port" && { echo "http://127.0.0.1:$port"; exit 0; }
   sleep 0.1
 done
-echo "html-artifacts: server did not become ready; see $HA_HOME/server.log" >&2
+echo "vellum: server did not become ready; see $HA_HOME/server.log" >&2
 exit 1

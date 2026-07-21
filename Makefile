@@ -1,11 +1,11 @@
-# html-artifacts — build / install / serve / test
+# vellum — build / install / serve / test
 #
-# The Go module lives in ./server. The binary is emitted to ./bin/html-artifacts.
+# The Go module lives in ./server. The binary is emitted to ./bin/vellum.
 
 BIN_DIR   := bin
-BIN       := $(BIN_DIR)/html-artifacts
+BIN       := $(BIN_DIR)/vellum
 PORT      ?= 47600
-DIR       ?= $(HOME)/.html-artifacts/artifacts
+DIR       ?= $(HOME)/.vellum/artifacts
 
 .PHONY: build install serve test vet fmt clean sync
 
@@ -32,11 +32,11 @@ serve: build
 
 ## sync: copy canonical CORE.md + ensure-server.sh + base.html into embed, plugin skill, and adapters
 sync:
-	mkdir -p skills/html-artifacts/templates adapters/claude-code/templates
-	cp instructions/CORE.md skills/html-artifacts/CORE.md
-	cp scripts/ensure-server.sh skills/html-artifacts/ensure-server.sh
-	cp adapters/claude-code/SKILL.md skills/html-artifacts/SKILL.md
-	cp instructions/templates/base.html skills/html-artifacts/templates/base.html
+	mkdir -p skills/vellum/templates adapters/claude-code/templates
+	cp instructions/CORE.md skills/vellum/CORE.md
+	cp scripts/ensure-server.sh skills/vellum/ensure-server.sh
+	cp adapters/claude-code/SKILL.md skills/vellum/SKILL.md
+	cp instructions/templates/base.html skills/vellum/templates/base.html
 	cp instructions/CORE.md adapters/claude-code/CORE.md
 	cp scripts/ensure-server.sh adapters/claude-code/ensure-server.sh
 	cp instructions/templates/base.html adapters/claude-code/templates/base.html

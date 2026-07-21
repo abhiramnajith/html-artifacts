@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	assets "github.com/abhiramnajith/html-artifacts/server/embed"
-	"github.com/abhiramnajith/html-artifacts/server/internal/storage"
+	assets "github.com/abhiramnajith/vellum/server/embed"
+	"github.com/abhiramnajith/vellum/server/internal/storage"
 )
 
 // shellTag is injected into every served artifact so the annotation editor

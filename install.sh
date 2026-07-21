@@ -94,7 +94,7 @@ else
 	SKILLS_ROOT="$HOME/.claude/skills"
 fi
 
-TARGET="$SKILLS_ROOT/html-artifacts"
+TARGET="$SKILLS_ROOT/vellum"
 
 mkdir -p "$TARGET"
 # Copy the thin adapter, the canonical CORE.md it defers to, the
@@ -109,11 +109,11 @@ chmod +x "$TARGET/ensure-server.sh"
 mkdir -p "$TARGET/templates"
 cp "$REPO_ROOT/instructions/templates/base.html" "$TARGET/templates/base.html"
 
-echo "installed html-artifacts adapter for '$AGENT' -> $TARGET"
+echo "installed vellum adapter for '$AGENT' -> $TARGET"
 
 if [ "$WITH_BINARY" -eq 1 ]; then
 	echo "fetching server binary now (--with-binary)..."
-	if HTML_ARTIFACTS_HOME="$HOME/.html-artifacts" "$REPO_ROOT/scripts/ensure-server.sh" >/dev/null; then
+	if VELLUM_HOME="$HOME/.vellum" "$REPO_ROOT/scripts/ensure-server.sh" >/dev/null; then
 		echo "server binary ready."
 	else
 		echo "warning: failed to fetch the server binary; it will be fetched on first use instead." >&2

@@ -4,10 +4,10 @@ cd "$(dirname "$0")/.."
 make build >/dev/null
 
 TMP="$(mktemp -d)"
-trap 'pkill -f "$TMP/.html-artifacts/bin" 2>/dev/null || true; rm -rf "$TMP"' EXIT
-export HTML_ARTIFACTS_HOME="$TMP/.html-artifacts"
-mkdir -p "$HTML_ARTIFACTS_HOME/bin"
-cp bin/html-artifacts "$HTML_ARTIFACTS_HOME/bin/html-artifacts"
+trap 'pkill -f "$TMP/.vellum/bin" 2>/dev/null || true; rm -rf "$TMP"' EXIT
+export VELLUM_HOME="$TMP/.vellum"
+mkdir -p "$VELLUM_HOME/bin"
+cp bin/vellum "$VELLUM_HOME/bin/vellum"
 
 url1="$(scripts/ensure-server.sh)"
 echo "first:  $url1"

@@ -60,7 +60,7 @@ These hold in **every** phase. A change that breaks one of these is a bug, not a
 ## Repo layout (target)
 
 ```
-html-artifacts/
+vellum/
 ├── README.md                    # what it is, install, usage, screenshots
 ├── LICENSE                      # MIT
 ├── install.sh                   # --agent claude|codex|opencode|copilot, --local
@@ -103,8 +103,8 @@ beyond the design doc's prose — treat them as the default and adjust only with
 ### Files on disk (default `./artifacts/`)
 
 > **Superseded by Phase 5:** the default moved from the project-local
-> `./artifacts/` below to the global `~/.html-artifacts/artifacts/` (override
-> via `HTML_ARTIFACTS_DIR`). The path shape (`<id>.html` / `<id>.annotations.json`)
+> `./artifacts/` below to the global `~/.vellum/artifacts/` (override
+> via `VELLUM_DIR`). The path shape (`<id>.html` / `<id>.annotations.json`)
 > is unchanged — only the base directory did.
 
 - Artifact: `./artifacts/<id>.html` — one self-contained file, inline CSS/JS, **no CDN dependencies**.
@@ -192,20 +192,20 @@ beyond the design doc's prose — treat them as the default and adjust only with
 
 ### Phase 5 — Lightweight distribution & hardening (done)
 - [x] Claude Code plugin (`.claude-plugin/marketplace.json` + `plugin.json`) so
-      `/plugin marketplace add abhiramnajith/html-artifacts` + `/plugin install
-      html-artifacts` installs the skill without a manual `git clone`.
+      `/plugin marketplace add abhiramnajith/vellum` + `/plugin install
+      vellum` installs the skill without a manual `git clone`.
 - [x] `scripts/ensure-server.sh`: lazily resolves a server binary (`$PATH` →
       local cache → GitHub release download, verified against the release's
       `SHA256SUMS` → `go install` fallback), picks the first free port starting
       at the new default **47600**, starts the server in the background, and
       records the chosen port so repeat calls reuse the same instance.
 - [x] Moved the default artifact store off the project-local `./artifacts/` to
-      a **global** per-user store, `~/.html-artifacts/artifacts/` (override via
-      `HTML_ARTIFACTS_DIR`), so artifacts and the running server persist across
+      a **global** per-user store, `~/.vellum/artifacts/` (override via
+      `VELLUM_DIR`), so artifacts and the running server persist across
       projects and sessions. `Makefile`'s `serve`/`DIR` default and `CORE.md`'s
       output contract were updated to match.
 - [x] CI: added a `checksums` job (`.github/workflows/ci.yml`, `needs: release`)
-      that downloads the tagged release's `html-artifacts-*` binaries, computes
+      that downloads the tagged release's `vellum-*` binaries, computes
       `sha256sum` over them into `SHA256SUMS`, and uploads it to the same
       release with `gh release upload --clobber` — this is the file
       `ensure-server.sh` verifies binary downloads against.
@@ -215,7 +215,7 @@ beyond the design doc's prose — treat them as the default and adjust only with
       `install.sh`), the global store, and the new default port.
 
 **Definition of done:** a user with neither a local clone nor Go installed can
-run `/plugin install html-artifacts` in Claude Code, ask for a visual
+run `/plugin install vellum` in Claude Code, ask for a visual
 deliverable, and have the binary, server, and artifact store all materialize
 automatically — verified against a published `SHA256SUMS` once a release
 exists.

@@ -30,7 +30,7 @@ jobs:
       - name: go test
         run: go test ./...
       - name: go build
-        run: go build -o /tmp/html-artifacts .
+        run: go build -o /tmp/vellum .
 
   create-release:
     name: create release
@@ -81,13 +81,13 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          out="html-artifacts-${{ matrix.goos }}-${{ matrix.goarch }}"
+          out="vellum-${{ matrix.goos }}-${{ matrix.goarch }}"
           go build -trimpath -o "../$out" .
       - name: attach to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          out="html-artifacts-${{ matrix.goos }}-${{ matrix.goarch }}"
+          out="vellum-${{ matrix.goos }}-${{ matrix.goarch }}"
           gh release upload "${{ github.ref_name }}" "../$out" \
             --clobber --repo "${{ github.repository }}"
 
@@ -109,6 +109,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ github.ref_name }}"
-          gh release download "$tag" --repo "${{ github.repository }}" --pattern 'html-artifacts-*'
-          sha256sum html-artifacts-* > SHA256SUMS
+          gh release download "$tag" --repo "${{ github.repository }}" --pattern 'vellum-*'
+          sha256sum vellum-* > SHA256SUMS
           gh release upload "$tag" SHA256SUMS --clobber --repo "${{ github.repository }}"

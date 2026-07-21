@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abhiramnajith/html-artifacts/server/internal/storage"
+	"github.com/abhiramnajith/vellum/server/internal/storage"
 )
 
 // newTestServer builds a Server over a temp artifacts dir seeded with one

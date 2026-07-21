@@ -1,4 +1,4 @@
-# html-artifacts
+# vellum
 
 An **agent-agnostic** tool that lets coding agents (Claude Code, Codex, OpenCode,
 Copilot CLI, …) emit rich, self-contained **HTML artifacts** — plans, comparisons,
@@ -33,8 +33,8 @@ There are two ways to install, depending on your agent.
 ### Claude Code — via the plugin marketplace
 
 ```
-/plugin marketplace add abhiramnajith/html-artifacts
-/plugin install html-artifacts
+/plugin marketplace add abhiramnajith/vellum
+/plugin install vellum
 ```
 
 This installs the skill (instructions, template, and the `ensure-server.sh`
@@ -45,8 +45,8 @@ up the new skill.
 ### Any other agent (or Claude Code without the plugin) — via `install.sh`
 
 ```sh
-git clone https://github.com/abhiramnajith/html-artifacts
-cd html-artifacts
+git clone https://github.com/abhiramnajith/vellum
+cd vellum
 ./install.sh --agent claude          # installs the adapter into ~/.claude/skills/
 ./install.sh --agent claude --local  # or into ./.claude/skills/ (project-local)
 ```
@@ -71,7 +71,7 @@ session opened in the project where you want the artifacts, just ask for the
 > "diagram the request lifecycle"
 
 The skill triggers on its own, writes a self-contained file to the **global
-artifact store** at `~/.html-artifacts/artifacts/<id>.html`, and opens it. The
+artifact store** at `~/.vellum/artifacts/<id>.html`, and opens it. The
 first time it runs, `ensure-server.sh` transparently fetches the right release
 binary for your OS/arch (verified against the release's `SHA256SUMS`), starts
 it in the background on the first free port from **47600** up, and records
@@ -86,7 +86,7 @@ otherwise straight from the file.
 **2. Annotate in the browser.** On any `/view/<id>` page, click **✎ Annotate**
 (bottom-right), then click an element or select text and leave a comment.
 Repeat, then hit **Send to agent** — that writes
-`~/.html-artifacts/artifacts/<id>.annotations.json`.
+`~/.vellum/artifacts/<id>.annotations.json`.
 
 **3. Ask the agent to apply your notes.** Back in your editor session:
 
@@ -108,7 +108,7 @@ and `adapters/copilot-cli` directories mark where thin per-agent adapters go
 
 ```sh
 make build     # builds the server binary into ./bin/
-make serve     # runs it on 127.0.0.1:47600, storing artifacts in ~/.html-artifacts/artifacts
+make serve     # runs it on 127.0.0.1:47600, storing artifacts in ~/.vellum/artifacts
                # override: make serve PORT=8080 DIR=./some/other/dir
 make test      # go vet + go test
 ```
@@ -116,12 +116,12 @@ make test      # go vet + go test
 Requires Go 1.23+. The server has zero third-party dependencies; the editor
 shell and index template are embedded in the binary. If you'd rather install
 the binary instead of building from a clone, `go install
-github.com/abhiramnajith/html-artifacts/server@latest` puts a binary named
-`server` (not `html-artifacts`) on your `$PATH`; run it with `server serve
---port 47600 --dir ~/.html-artifacts/artifacts`.
+github.com/abhiramnajith/vellum/server@latest` puts a binary named
+`server` (not `vellum`) on your `$PATH`; run it with `server serve
+--port 47600 --dir ~/.vellum/artifacts`.
 
 Prebuilt binaries for the current release (once one is cut) are attached to
-the corresponding [GitHub Release](https://github.com/abhiramnajith/html-artifacts/releases),
+the corresponding [GitHub Release](https://github.com/abhiramnajith/vellum/releases),
 alongside a `SHA256SUMS` file for verification — this is what `ensure-server.sh`
 downloads and checks automatically, so most users never need to fetch these by hand.
 

@@ -25,7 +25,7 @@ Two limitations surfaced after v1:
 
 ## Added post-review
 
-- **`render` subcommand** — `html-artifacts render <path.md>` converts an
+- **`render` subcommand** — `vellum render <path.md>` converts an
   existing Markdown file (plan, spec, README, doc) into an artifact in the store
   and prints its `/view/<id>` URL. Uses a small stdlib-only Markdown renderer and
   the embedded `base.html`. Distinct from authoring new rich artifacts (§2–3 of
@@ -47,7 +47,7 @@ Two limitations surfaced after v1:
   shell. It leaves `instructions/` and all skill dirs.
 - **Default port `47600`** (quiet registered range), overridable with `--port`;
   auto-start walks to the next free port if taken.
-- **Global artifacts store** `~/.html-artifacts/artifacts/` is the new default
+- **Global artifacts store** `~/.vellum/artifacts/` is the new default
   `--dir`, so one always-on server serves everything regardless of cwd.
   `--dir` still overrides for anyone who wants project-local artifacts.
 - Server **auto-starts on demand** (no service to install); the same routine
@@ -95,29 +95,29 @@ One POSIX shell script, installed beside the skill and bundled in the plugin.
 `CORE.md` calls it before opening an artifact; it prints the base URL on stdout
 (e.g. `http://127.0.0.1:47600`). Logic:
 
-1. **Already running?** If `~/.html-artifacts/port` exists and the server answers
+1. **Already running?** If `~/.vellum/port` exists and the server answers
    at that port (`curl -sf .../artifacts`) → print URL, exit 0.
 2. **Ensure the binary**, first hit wins:
-   - `html-artifacts` on `$PATH`
-   - `~/.html-artifacts/bin/html-artifacts`
+   - `vellum` on `$PATH`
+   - `~/.vellum/bin/vellum`
    - **download** the prebuilt release binary for this OS/arch from the latest
-     GitHub Release into `~/.html-artifacts/bin/`, `chmod +x`
-   - `go install github.com/abhiramnajith/html-artifacts/server@latest` fallback
+     GitHub Release into `~/.vellum/bin/`, `chmod +x`
+   - `go install github.com/abhiramnajith/vellum/server@latest` fallback
      (binary lands as `server`)
    - else: exit non-zero with a clear message (how to install Go / download).
 3. **Pick a free port** starting at `47600`, incrementing until one binds.
 4. **Start** `<binary> serve --port <port> --dir "$HA_DIR"` in the background
    (`nohup … &`, detached), where `HA_DIR` defaults to
-   `~/.html-artifacts/artifacts` (override via `HTML_ARTIFACTS_DIR`).
-5. **Record** the port in `~/.html-artifacts/port`; poll until the server
+   `~/.vellum/artifacts` (override via `VELLUM_DIR`).
+5. **Record** the port in `~/.vellum/port`; poll until the server
    answers; print `http://127.0.0.1:<port>`.
 
 ### State & storage
 
-- `~/.html-artifacts/` holds `bin/`, `artifacts/`, and `port`.
+- `~/.vellum/` holds `bin/`, `artifacts/`, and `port`.
 - Global artifacts dir is the default; the server, `List`, annotations, and the
   apply-loop all operate there. `main.go`'s `--dir` default changes from
-  `./artifacts` to `~/.html-artifacts/artifacts` (created if missing).
+  `./artifacts` to `~/.vellum/artifacts` (created if missing).
 
 ### `CORE.md` open step (§5)
 
@@ -140,10 +140,10 @@ the answer to "is it published".
 
 - `.claude-plugin/marketplace.json` — marketplace listing this one plugin.
 - `.claude-plugin/plugin.json` — plugin metadata (name, version, description).
-- `skills/html-artifacts/` — the shipped skill: `SKILL.md`, `CORE.md`,
+- `skills/vellum/` — the shipped skill: `SKILL.md`, `CORE.md`,
   `ensure-server.sh`. No Mermaid (now in the binary), so the plugin is light.
-- Install UX: `/plugin marketplace add abhiramnajith/html-artifacts` then
-  `/plugin install html-artifacts`. Binary is fetched lazily by `ensure-server.sh`
+- Install UX: `/plugin marketplace add abhiramnajith/vellum` then
+  `/plugin install vellum`. Binary is fetched lazily by `ensure-server.sh`
   on first use (plugins can't run arbitrary install steps — consistent with the
   on-demand model).
 - Exact manifest field names to be confirmed against current Claude Code plugin
@@ -159,7 +159,7 @@ the answer to "is it published".
 ### 4. Single source of truth
 
 `instructions/CORE.md` stays canonical. A `make sync` target copies it (and
-`ensure-server.sh`) into `skills/html-artifacts/` and each `adapters/*/` so there
+`ensure-server.sh`) into `skills/vellum/` and each `adapters/*/` so there
 is no hand-maintained duplication (upholds the "no duplicated instructions"
 invariant). `make sync` runs as part of the release step.
 
@@ -173,11 +173,11 @@ invariant). `make sync` runs as part of the release step.
 | `instructions/templates/vendor/` | removed |
 | `instructions/templates/base.html` | drop inlined Mermaid; keep `.mermaid` + init |
 | `server/internal/server/server.go` | `/_vendor/mermaid.min.js` route; inject Mermaid in `/view` when diagrams present |
-| `server/main.go` | default `--dir` → `~/.html-artifacts/artifacts`; default `--port` → `47600` |
+| `server/main.go` | default `--dir` → `~/.vellum/artifacts`; default `--port` → `47600` |
 | `scripts/ensure-server.sh` | new bootstrap + auto-start script |
 | `instructions/CORE.md` | remove inline-Mermaid step; new open step via ensure-server |
 | `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json` | new plugin manifest |
-| `skills/html-artifacts/` | new: plugin-shipped skill (synced from canonical) |
+| `skills/vellum/` | new: plugin-shipped skill (synced from canonical) |
 | `install.sh` | drop templates copy; add `ensure-server.sh`; optional `--with-binary` |
 | `Makefile` | `sync` target; default port/dir updates |
 | `README.md`, `docs/PLAN.md` | document new install/usage, port, storage |

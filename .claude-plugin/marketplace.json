@@ -1,10 +1,10 @@
 {
-  "name": "abhiramnajith-html-artifacts",
+  "name": "abhiramnajith-vellum",
   "owner": { "name": "abhiramnajith" },
-  "description": "Marketplace for the html-artifacts plugin: rich, self-contained HTML artifacts and a local annotation editor for coding agents.",
+  "description": "Marketplace for the vellum plugin: rich, self-contained HTML artifacts and a local annotation editor for coding agents.",
   "plugins": [
     {
-      "name": "html-artifacts",
+      "name": "vellum",
       "source": "./",
       "description": "HTML artifacts + local annotation editor for coding agents."
     }

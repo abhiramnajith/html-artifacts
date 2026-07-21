@@ -70,8 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /artifacts", s.handleIndex)
 	mux.HandleFunc("GET /view/{id}", s.handleView)
 	mux.HandleFunc("GET /_editor/shell.js", s.handleShell)
-	// NOTE: GET /_vendor/mermaid.min.js is added in Task 2 (handleMermaid does
-	// not exist yet).
+	mux.HandleFunc("GET /_vendor/mermaid.min.js", s.handleMermaid)
 	mux.HandleFunc("POST /annotations/{id}", s.handlePostAnnotations)
 	mux.HandleFunc("GET /annotations/{id}", s.handleGetAnnotations)
 	return localhostOnly(mux)
@@ -171,6 +170,20 @@ func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = w.Write(data)
+}
+
+// handleMermaid serves the embedded Mermaid runtime so artifacts can load it
+// from the local server instead of inlining the 3.4 MB library into every
+// generated file.
+func (s *Server) handleMermaid(w http.ResponseWriter, r *http.Request) {
+	data, err := assets.Files.ReadFile("mermaid.min.js")
+	if err != nil {
+		http.Error(w, "mermaid runtime unavailable", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write(data)
 }
 

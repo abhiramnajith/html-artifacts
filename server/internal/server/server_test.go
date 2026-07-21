@@ -118,6 +118,17 @@ func TestEditorShellIsServed(t *testing.T) {
 	}
 }
 
+func TestMermaidRuntimeIsServed(t *testing.T) {
+	h, _ := newTestServer(t)
+	resp := do(t, h, "GET", "/_vendor/mermaid.min.js")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /_vendor/mermaid.min.js: want 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "javascript") {
+		t.Fatalf("GET /_vendor/mermaid.min.js: want javascript content-type, got %q", ct)
+	}
+}
+
 func TestListenAddrIsLoopbackOnly(t *testing.T) {
 	// The server must never be reachable off-host: the bind address is always
 	// 127.0.0.1, never a wildcard like ":7777" or "0.0.0.0".

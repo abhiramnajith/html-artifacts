@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
-          cache-dependency-path: server/go.sum
+          # Zero third-party dependencies -> no go.sum -> nothing to cache.
+          cache: false
       - name: gofmt (check)
         run: test -z "$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
       - name: go vet
@@ -73,6 +74,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
       - name: build ${{ matrix.goos }}/${{ matrix.goarch }}
         env:
           GOOS: ${{ matrix.goos }}

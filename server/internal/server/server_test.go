@@ -32,6 +32,7 @@ func newTestServer(t *testing.T) (http.Handler, string) {
 func do(t *testing.T, h http.Handler, method, path string) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
+	req.Host = "127.0.0.1:47600"
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec.Result()
@@ -132,6 +133,7 @@ func TestListenAddrIsLoopbackOnly(t *testing.T) {
 func doPost(t *testing.T, h http.Handler, path, body string) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Host = "127.0.0.1:47600"
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

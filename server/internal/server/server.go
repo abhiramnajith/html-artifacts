@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -59,16 +61,53 @@ func New(store *storage.Store) (*Server, error) {
 	return &Server{store: store, index: index}, nil
 }
 
-// Handler returns the HTTP handler for all routes.
+// Handler returns the HTTP handler for all routes, wrapped so the server only
+// answers loopback requests (defends against DNS rebinding and cross-site
+// writes via the user's browser).
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleRoot)
 	mux.HandleFunc("GET /artifacts", s.handleIndex)
 	mux.HandleFunc("GET /view/{id}", s.handleView)
 	mux.HandleFunc("GET /_editor/shell.js", s.handleShell)
+	// NOTE: GET /_vendor/mermaid.min.js is added in Task 2 (handleMermaid does
+	// not exist yet).
 	mux.HandleFunc("POST /annotations/{id}", s.handlePostAnnotations)
 	mux.HandleFunc("GET /annotations/{id}", s.handleGetAnnotations)
-	return mux
+	return localhostOnly(mux)
+}
+
+func localhostOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) {
+			http.Error(w, "forbidden: non-loopback host", http.StatusForbidden)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if origin := r.Header.Get("Origin"); origin != "" && !isLoopbackOrigin(origin) {
+				http.Error(w, "forbidden: cross-origin request", http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isLoopbackHost(host string) bool {
+	h := host
+	if hh, _, err := net.SplitHostPort(host); err == nil {
+		h = hh
+	}
+	h = strings.TrimPrefix(strings.TrimSuffix(h, "]"), "[")
+	return h == "127.0.0.1" || h == "localhost" || h == "::1"
+}
+
+func isLoopbackOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return isLoopbackHost(u.Host)
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {

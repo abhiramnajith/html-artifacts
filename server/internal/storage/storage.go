@@ -85,6 +85,52 @@ func (s *Store) ReadArtifact(id string) ([]byte, error) {
 	return data, nil
 }
 
+// ArtifactExists reports whether an artifact with the given id exists.
+func (s *Store) ArtifactExists(id string) (bool, error) {
+	path, err := s.resolvePath(id, ".html")
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("stat artifact %q: %w", id, err)
+	}
+	return true, nil
+}
+
+// WriteAnnotations persists the annotation JSON for id to
+// <id>.annotations.json, creating or overwriting it.
+func (s *Store) WriteAnnotations(id string, data []byte) error {
+	path, err := s.resolvePath(id, ".annotations.json")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write annotations %q: %w", id, err)
+	}
+	return nil
+}
+
+// ReadAnnotations returns the raw annotation JSON for id, or ErrNotFound if
+// none has been written.
+func (s *Store) ReadAnnotations(id string) ([]byte, error) {
+	path, err := s.resolvePath(id, ".annotations.json")
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %q", ErrNotFound, id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read annotations %q: %w", id, err)
+	}
+	return data, nil
+}
+
 // List returns every artifact in the directory, newest first. A missing
 // directory is treated as empty, not an error.
 func (s *Store) List() ([]Artifact, error) {

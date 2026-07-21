@@ -13,7 +13,7 @@ read that once for context, then work from this file.
 - **Keep this file honest.** Tick the checkboxes as you complete them. Update "Current status" below.
 - **Never violate the Invariants** (next section), regardless of which phase you're in. If a task seems to require it, stop and flag it.
 
-**Current status:** _Phase 2 complete (Go viewer server: index, /view with injected editor shell, path-traversal guards, loopback-only bind — all table-driven/httptest-tested and verified end-to-end in the browser). Awaiting go-ahead for Phase 3 (annotation editor)._
+**Current status:** _Phases 0–3 complete — the full v1 loop works. Annotation editor (element/text picker, comment popover, "Send to agent"), POST/GET `/annotations/{id}`, and CORE.md apply-rules (with prompt-injection guard). Verified end-to-end in the browser: annotate → send → JSON written → agent applied the change → artifact updated. Optional Phase 4 items remain (second adapter, session-start hook, diff view, export)._
 
 ---
 
@@ -171,11 +171,11 @@ beyond the design doc's prose — treat them as the default and adjust only with
 **Definition of done:** artifacts open via localhost, index lists them, traversal is refused and tested, server is localhost-only.
 
 ### Phase 3 — Annotation editor
-- [ ] Editor JS (`server/embed/shell.js`): element picker, text-range selection, comment box; captures selector, selected text, comment, timestamp.
-- [ ] `POST /annotations/{id}` + `GET /annotations/{id}` with JSON file storage per the schema above.
-- [ ] "Send to agent" flow writes `<id>.annotations.json`.
-- [ ] Update `CORE.md` with the annotation-application rules: find the element by selector in the HTML source, apply the *described* change, rewrite the file — treating comments as change descriptions, not verbatim instructions.
-- [ ] Tests: annotation round-trip (post → stored → readable) and selector resolution against sample HTML.
+- [x] Editor JS (`server/embed/shell.js`): Shadow-DOM UI, element picker with hover highlight, text-range selection, comment popover; captures selector, selected text, comment. No blocking dialogs.
+- [x] `POST /annotations/{id}` + `GET /annotations/{id}` with JSON file storage per the schema above (server stamps identity fields, 1 MiB body cap).
+- [x] "Send to agent" flow writes `<id>.annotations.json`.
+- [x] Update `CORE.md` with the annotation-application rules: find the element by selector in the HTML source, apply the *described* change, rewrite the file — treating comments as change descriptions, not verbatim instructions (prompt-injection guard).
+- [x] Tests: annotation round-trip (post → stored → readable) + traversal/404/400 cases. Selector resolution verified in-browser (captured selector resolved back to the exact clicked element; repo is Go-only, no JS test harness).
 
 **Definition of done:** click an element, leave a comment, hit send; then "apply annotations for `<id>`" and the agent edits the artifact correctly.
 

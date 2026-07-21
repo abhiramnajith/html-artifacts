@@ -5,19 +5,43 @@ package server
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	assets "github.com/abhiramnajith/html-artifacts/server/embed"
 	"github.com/abhiramnajith/html-artifacts/server/internal/storage"
 )
 
-// shellTag is injected into every served artifact so the (Phase 3) annotation
-// editor loads around it without modifying the artifact file on disk.
+// shellTag is injected into every served artifact so the annotation editor
+// loads around it without modifying the artifact file on disk.
 const shellTag = `<script src="/_editor/shell.js" defer></script>`
+
+// maxAnnotationBody caps the POST body for annotations. Localhost-only, but a
+// bound keeps a runaway client from filling memory or disk.
+const maxAnnotationBody = 1 << 20 // 1 MiB
+
+// Annotation is one comment attached to an element or text range in an artifact.
+type Annotation struct {
+	ID           string `json:"id"`
+	Selector     string `json:"selector"`
+	SelectedText string `json:"selectedText"`
+	Comment      string `json:"comment"`
+	CreatedAt    string `json:"createdAt"`
+}
+
+// AnnotationFile is the on-disk shape of <id>.annotations.json. The identity
+// fields are authoritative from the server, not the client.
+type AnnotationFile struct {
+	ArtifactID   string       `json:"artifactId"`
+	ArtifactFile string       `json:"artifactFile"`
+	CreatedAt    string       `json:"createdAt"`
+	Annotations  []Annotation `json:"annotations"`
+}
 
 // Server holds the dependencies shared by the HTTP handlers.
 type Server struct {
@@ -42,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /artifacts", s.handleIndex)
 	mux.HandleFunc("GET /view/{id}", s.handleView)
 	mux.HandleFunc("GET /_editor/shell.js", s.handleShell)
+	mux.HandleFunc("POST /annotations/{id}", s.handlePostAnnotations)
+	mux.HandleFunc("GET /annotations/{id}", s.handleGetAnnotations)
 	return mux
 }
 
@@ -106,6 +132,81 @@ func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = w.Write(data)
+}
+
+func (s *Server) handlePostAnnotations(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	exists, err := s.store.ArtifactExists(id)
+	if errors.Is(err, storage.ErrInvalidID) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "failed to check artifact", http.StatusInternalServerError)
+		return
+	}
+	if !exists {
+		http.NotFound(w, r)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAnnotationBody)
+	var af AnnotationFile
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&af); err != nil {
+		http.Error(w, "invalid annotation JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Identity fields are authoritative from the URL, not the client. Stamp
+	// timestamps server-side and give each annotation a stable id.
+	now := time.Now().UTC().Format(time.RFC3339)
+	af.ArtifactID = id
+	af.ArtifactFile = id + ".html"
+	af.CreatedAt = now
+	for i := range af.Annotations {
+		if af.Annotations[i].ID == "" {
+			af.Annotations[i].ID = fmt.Sprintf("a%d", i+1)
+		}
+		if af.Annotations[i].CreatedAt == "" {
+			af.Annotations[i].CreatedAt = now
+		}
+	}
+
+	// Encode without HTML escaping so selectors keep their literal '>' etc.
+	// in the stored file (they decode identically either way).
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(af); err != nil {
+		http.Error(w, "failed to encode annotations", http.StatusInternalServerError)
+		return
+	}
+	data := buf.Bytes()
+	if err := s.store.WriteAnnotations(id, data); err != nil {
+		http.Error(w, "failed to store annotations", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write(data)
+}
+
+func (s *Server) handleGetAnnotations(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	data, err := s.store.ReadAnnotations(id)
+	if errors.Is(err, storage.ErrInvalidID) || errors.Is(err, storage.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "failed to read annotations", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write(data)
 }
 

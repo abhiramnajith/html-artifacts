@@ -129,6 +129,78 @@ func TestListenAddrIsLoopbackOnly(t *testing.T) {
 	}
 }
 
+func doPost(t *testing.T, h http.Handler, path, body string) *http.Response {
+	t.Helper()
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec.Result()
+}
+
+func TestAnnotationsRoundTripAndServerStampsID(t *testing.T) {
+	h, id := newTestServer(t)
+
+	// The client claims a DIFFERENT artifactId; the server must overwrite it
+	// with the id from the URL.
+	body := `{"artifactId":"someone-elses-artifact","annotations":[` +
+		`{"selector":"#comparison-table","selectedText":"","comment":"add a bundle-size row"}]}`
+
+	post := doPost(t, h, "/annotations/"+id, body)
+	if post.StatusCode != http.StatusOK {
+		t.Fatalf("POST /annotations/%s: want 200, got %d", id, post.StatusCode)
+	}
+
+	get := do(t, h, "GET", "/annotations/"+id)
+	if get.StatusCode != http.StatusOK {
+		t.Fatalf("GET /annotations/%s: want 200, got %d", id, get.StatusCode)
+	}
+	stored := readBody(t, get)
+	if strings.Contains(stored, "someone-elses-artifact") {
+		t.Fatal("server did not overwrite the client-supplied artifactId")
+	}
+	if !strings.Contains(stored, id) {
+		t.Fatalf("stored annotations do not carry the URL id %q: %s", id, stored)
+	}
+	if !strings.Contains(stored, "add a bundle-size row") {
+		t.Fatalf("stored annotations missing the comment: %s", stored)
+	}
+}
+
+func TestPostAnnotationsForMissingArtifactIs404(t *testing.T) {
+	h, _ := newTestServer(t)
+	resp := doPost(t, h, "/annotations/nope-20260101-000000", `{"annotations":[]}`)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("POST for missing artifact: want 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestPostAnnotationsInvalidJSONIs400(t *testing.T) {
+	h, id := newTestServer(t)
+	resp := doPost(t, h, "/annotations/"+id, `{not json`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("POST invalid JSON: want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetAnnotationsWhenNoneIs404(t *testing.T) {
+	h, id := newTestServer(t)
+	resp := do(t, h, "GET", "/annotations/"+id)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("GET annotations (none written): want 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAnnotationsTraversalRefused(t *testing.T) {
+	h, _ := newTestServer(t)
+	if resp := doPost(t, h, "/annotations/..%2f..%2fetc%2fpasswd", `{}`); resp.StatusCode == http.StatusOK {
+		t.Fatal("POST annotations traversal returned 200")
+	}
+	if resp := do(t, h, "GET", "/annotations/A"); resp.StatusCode == http.StatusOK {
+		t.Fatal("GET annotations invalid id returned 200")
+	}
+}
+
 func readBody(t *testing.T, resp *http.Response) string {
 	t.Helper()
 	defer resp.Body.Close()

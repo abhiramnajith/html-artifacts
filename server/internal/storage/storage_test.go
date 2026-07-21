@@ -108,6 +108,61 @@ func TestListReturnsArtifactsSortedNewestFirst(t *testing.T) {
 	}
 }
 
+func TestAnnotationsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	id := "react-vs-vue-20260721-103000"
+	s := New(dir)
+
+	want := []byte(`{"artifactId":"react-vs-vue-20260721-103000","annotations":[]}`)
+	if err := s.WriteAnnotations(id, want); err != nil {
+		t.Fatalf("WriteAnnotations: %v", err)
+	}
+	got, err := s.ReadAnnotations(id)
+	if err != nil {
+		t.Fatalf("ReadAnnotations: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("round-trip mismatch: got %q want %q", got, want)
+	}
+	// It must land at <id>.annotations.json, next to the artifact.
+	if _, err := os.Stat(filepath.Join(dir, id+".annotations.json")); err != nil {
+		t.Fatalf("annotations file not written where expected: %v", err)
+	}
+}
+
+func TestWriteAnnotationsRejectsInvalidID(t *testing.T) {
+	s := New(t.TempDir())
+	if err := s.WriteAnnotations("../evil", []byte("{}")); !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("WriteAnnotations(bad id): want ErrInvalidID, got %v", err)
+	}
+}
+
+func TestReadAnnotationsMissingReturnsNotFound(t *testing.T) {
+	s := New(t.TempDir())
+	if _, err := s.ReadAnnotations("valid-20260101-000000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReadAnnotations(absent): want ErrNotFound, got %v", err)
+	}
+}
+
+func TestArtifactExists(t *testing.T) {
+	dir := t.TempDir()
+	id := "present-20260101-000000"
+	if err := os.WriteFile(filepath.Join(dir, id+".html"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := New(dir)
+
+	if ok, err := s.ArtifactExists(id); err != nil || !ok {
+		t.Fatalf("ArtifactExists(present): want true,nil got %v,%v", ok, err)
+	}
+	if ok, err := s.ArtifactExists("absent-20260101-000000"); err != nil || ok {
+		t.Fatalf("ArtifactExists(absent): want false,nil got %v,%v", ok, err)
+	}
+	if _, err := s.ArtifactExists("../evil"); !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("ArtifactExists(bad id): want ErrInvalidID, got %v", err)
+	}
+}
+
 func TestListOnMissingDirReturnsEmpty(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "not-created-yet")
 	got, err := New(dir).List()

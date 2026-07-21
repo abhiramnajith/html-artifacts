@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/abhiramnajith/html-artifacts/server/internal/server"
@@ -41,10 +42,14 @@ func run(args []string) error {
 
 func serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	port := fs.Int("port", 7777, "port to bind on 127.0.0.1")
-	dir := fs.String("dir", "./artifacts", "directory holding artifacts and annotations")
+	port := fs.Int("port", 47600, "port to bind on 127.0.0.1")
+	dir := fs.String("dir", defaultArtifactsDir(), "directory holding artifacts and annotations")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if err := os.MkdirAll(*dir, 0o700); err != nil { // 0700: Finding 4 — not readable by other local users
+		return fmt.Errorf("create artifacts dir %s: %w", *dir, err)
 	}
 
 	srv, err := server.New(storage.New(*dir))
@@ -67,6 +72,14 @@ func serve(args []string) error {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+func defaultArtifactsDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "./artifacts"
+	}
+	return filepath.Join(home, ".html-artifacts", "artifacts")
 }
 
 func usage() {

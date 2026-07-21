@@ -24,12 +24,70 @@ var (
 	reTableSep = regexp.MustCompile(`^\s*\|?[\s:|-]+\|?\s*$`)
 )
 
+// safeURL reports whether url is safe to place in an href attribute.
+// The URL has already been through html.EscapeString by the time this is
+// called, so any embedded quotes/angle-brackets are already neutralized;
+// this only needs to check the scheme.
+func safeURL(url string) bool {
+	if url == "" {
+		return false
+	}
+	if strings.HasPrefix(url, "#") {
+		return true
+	}
+	lower := strings.ToLower(url)
+	for _, scheme := range []string{"http://", "https://", "mailto:"} {
+		if strings.HasPrefix(lower, scheme) {
+			return true
+		}
+	}
+	// Relative URLs: either rooted at "/" or containing no scheme separator
+	// at all. Anything with a ":" before the first "/" is treated as a
+	// scheme (javascript:, data:, vbscript:, etc.) and rejected.
+	if strings.HasPrefix(url, "/") {
+		return true
+	}
+	if !strings.Contains(url, ":") {
+		return true
+	}
+	return false
+}
+
+// applyBoldAndLinks runs the bold and link substitutions over a string that
+// contains no inline-code spans (callers must exempt code-span content).
+func applyBoldAndLinks(s string) string {
+	s = reBold.ReplaceAllString(s, "<strong>$1</strong>")
+	s = reLink.ReplaceAllStringFunc(s, func(m string) string {
+		sub := reLink.FindStringSubmatch(m)
+		text, url := sub[1], sub[2]
+		if !safeURL(url) {
+			return text
+		}
+		return `<a href="` + url + `">` + text + `</a>`
+	})
+	return s
+}
+
+// inlineFmt escapes HTML in s, then applies inline markdown formatting
+// (code spans, bold, links). Inline code spans are carved out first and
+// their contents are exempt from the bold/link passes, so that formatting
+// syntax or dangerous link schemes written inside a code span are rendered
+// literally rather than being turned into live markup.
 func inlineFmt(s string) string {
 	s = html.EscapeString(s)
-	s = reInlCode.ReplaceAllString(s, "<code>$1</code>")
-	s = reBold.ReplaceAllString(s, "<strong>$1</strong>")
-	s = reLink.ReplaceAllString(s, `<a href="$2">$1</a>`)
-	return s
+
+	var b strings.Builder
+	last := 0
+	for _, idx := range reInlCode.FindAllStringSubmatchIndex(s, -1) {
+		// idx: [fullStart, fullEnd, groupStart, groupEnd]
+		b.WriteString(applyBoldAndLinks(s[last:idx[0]]))
+		b.WriteString("<code>")
+		b.WriteString(s[idx[2]:idx[3]])
+		b.WriteString("</code>")
+		last = idx[1]
+	}
+	b.WriteString(applyBoldAndLinks(s[last:]))
+	return b.String()
 }
 
 func cells(row string) []string {

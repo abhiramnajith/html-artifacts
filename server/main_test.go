@@ -32,3 +32,15 @@ func TestRenderCmdWritesArtifact(t *testing.T) {
 		t.Fatalf("rendered artifact missing converted content:\n%s", body)
 	}
 }
+
+func TestRenderCmdRejectsInvalidID(t *testing.T) {
+	dir := t.TempDir()
+	md := filepath.Join(dir, "n.md")
+	os.WriteFile(md, []byte("# hi\n"), 0o644)
+	if err := renderCmd([]string{"--dir", dir, "--id", "Bad_ID", md}); err == nil {
+		t.Fatal("expected error for invalid --id")
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.html")); len(matches) != 0 {
+		t.Fatalf("no artifact should be written for invalid id, got %v", matches)
+	}
+}

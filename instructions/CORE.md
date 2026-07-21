@@ -122,20 +122,22 @@ markup, not a rendered diagram.
 ## 5. After writing — open it
 
 Open the finished artifact in the browser. Prefer the local viewer server (it
-lists all artifacts and, later, hosts the annotation editor); fall back to
-opening the file directly if the server isn't running.
+lists all artifacts, renders Mermaid diagrams, and later hosts the annotation
+editor); fall back to opening the file directly only if the server can't be
+started.
 
-The server binds `127.0.0.1:<port>` (default `7777`) and serves
-`/view/<id>`. Check whether it is up, then open the right URL:
+Run the bundled `ensure-server.sh` (next to this file in the installed skill
+directory). It bootstraps the server binary if needed and auto-starts it on a
+free port (default `47600`), printing the base URL — e.g.
+`http://127.0.0.1:47600` — on stdout. Capture that URL and append `/view/<id>`:
 
 ```sh
-PORT=7777
-if curl -sf -o /dev/null "http://127.0.0.1:$PORT/artifacts"; then
-  URL="http://127.0.0.1:$PORT/view/<id>"
-else
-  URL="./artifacts/<id>.html"   # server not running — open the file directly
-fi
+BASE_URL="$(bash "$SKILL_DIR/ensure-server.sh")" && \
+URL="$BASE_URL/view/<id>"
 ```
+
+(`$SKILL_DIR` is this skill's installed directory — the same one `CORE.md` and
+`templates/` live in.)
 
 Then open `$URL` cross-platform:
 
@@ -143,8 +145,15 @@ Then open `$URL` cross-platform:
 - **Linux:** `xdg-open "$URL"`
 - **Windows:** `start "" "$URL"`
 
-Start the server with `make serve` (or `html-artifacts serve --port <port>
---dir ./artifacts`) if it isn't already running.
+If the script fails (nonzero exit — no binary available and no network/Go to
+fetch one), fall back to opening `./artifacts/<id>.html` directly instead,
+e.g. `open "./artifacts/<id>.html"`, and note to the user that Mermaid diagrams
+won't render in that fallback (§4).
+
+By default artifacts are written to the invoking project's `./artifacts/`
+directory but *served* from the global store at `~/.html-artifacts/artifacts`
+(override via `HTML_ARTIFACTS_DIR`) — the viewer lists whatever is in that
+directory, not just the current project's output.
 
 Then tell the user the URL (or file path) and give a one-line summary of what
 you built.

@@ -14,5 +14,12 @@ coverage.*
 # Generated project-local skill install (produced by ./install.sh --local)
 /.claude/
 
+# Generated adapter copies (produced by `make sync`; canonical source is
+# instructions/ + scripts/ — skills/html-artifacts/ copies ARE tracked since
+# the plugin ships them)
+/adapters/claude-code/CORE.md
+/adapters/claude-code/ensure-server.sh
+/adapters/claude-code/templates/
+
 # OS / editor cruft
 .DS_Store

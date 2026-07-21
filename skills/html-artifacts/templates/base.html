@@ -1,0 +1,299 @@
+<!doctype html>
+<!--
+  html-artifacts base template. Self-contained: inline CSS, system fonts, no
+  network dependencies. See instructions/CORE.md for how to fill the placeholder
+  tokens and for the optional Mermaid block. (This comment intentionally lists
+  no placeholder tokens, so a global find/replace never touches it.)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="html-artifacts">
+<title>{{TITLE}}</title>
+<style>
+  :root {
+    /* Light — cool paper, single cobalt signal. */
+    --bg:        #f7f8fa;
+    --surface:   #ffffff;
+    --ink:       #171a1f;
+    --muted:     #5b6672;
+    --faint:     #8a94a0;
+    --border:    #e3e7ec;
+    --border-strong: #cdd4dc;
+    --accent:    #2f45c5;
+    --accent-ink:#ffffff;
+    --accent-wash: #eef1fe;
+    --ok:        #1f7a4d;
+    --ok-wash:   #e4f4ec;
+    --warn:      #9a5b00;
+    --warn-wash: #fbedd6;
+    --danger:    #b02a37;
+    --danger-wash:#fbe6e8;
+    --shadow:    0 1px 2px rgba(16,22,38,.06), 0 8px 24px -12px rgba(16,22,38,.16);
+
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, "Cascadia Code", Consolas, monospace;
+
+    --measure: 74ch;
+    --radius:  10px;
+    --radius-sm: 7px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #0d1014;
+      --surface:   #14181e;
+      --ink:       #e7ecf2;
+      --muted:     #a2adba;
+      --faint:     #6b7684;
+      --border:    #232a33;
+      --border-strong: #313a45;
+      --accent:    #8b98ff;
+      --accent-ink:#0d1014;
+      --accent-wash: #191d33;
+      --ok:        #57cc8f;
+      --ok-wash:   #10241b;
+      --warn:      #e2a24d;
+      --warn-wash: #241a0c;
+      --danger:    #f2818c;
+      --danger-wash:#2a1315;
+      --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: clamp(1.25rem, 4vw, 3rem) clamp(1.15rem, 5vw, 2.5rem) 5rem;
+  }
+
+  /* ---- Signature: the artifact plate ------------------------------------ */
+  .plate {
+    display: flex;
+    align-items: baseline;
+    gap: .75rem;
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    letter-spacing: .02em;
+    color: var(--muted);
+    padding-bottom: .7rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2.4rem;
+  }
+  .plate__mark {
+    width: .62rem; height: .62rem;
+    background: var(--accent);
+    border-radius: 2px;
+    align-self: center;
+    flex: none;
+  }
+  .plate__id { color: var(--ink); font-weight: 600; }
+  .plate__sep { color: var(--faint); }
+  .plate time { color: var(--muted); }
+
+  /* ---- Headings --------------------------------------------------------- */
+  h1, h2, h3, h4 { line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 .5em; font-weight: 720; }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); margin-bottom: .35em; }
+  h2 {
+    font-size: 1.5rem; margin-top: 2.6rem;
+    padding-top: 1.5rem; border-top: 1px solid var(--border);
+  }
+  h3 { font-size: 1.16rem; margin-top: 1.9rem; }
+  h4 { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; font-family: var(--font-mono); }
+
+  /* Eyebrow label, in the instrument voice */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--accent);
+    margin: 0 0 .6rem;
+  }
+
+  .lede { font-size: 1.16rem; color: var(--muted); margin: 0 0 2rem; max-width: 60ch; }
+
+  p { margin: 0 0 1.05rem; }
+  a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+  a:hover { text-decoration-color: var(--accent); }
+
+  ul, ol { margin: 0 0 1.15rem; padding-left: 1.3rem; }
+  li { margin: .28rem 0; }
+  li::marker { color: var(--faint); }
+
+  strong { font-weight: 680; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 2.4rem 0; }
+
+  /* ---- Code ------------------------------------------------------------- */
+  code {
+    font-family: var(--font-mono);
+    font-size: .86em;
+    background: var(--accent-wash);
+    color: var(--ink);
+    padding: .12em .4em;
+    border-radius: 5px;
+  }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    margin: 0 0 1.4rem;
+  }
+  pre code { background: none; padding: 0; font-size: .82rem; line-height: 1.6; color: var(--ink); }
+
+  /* ---- Cards ------------------------------------------------------------ */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.35rem;
+    box-shadow: var(--shadow);
+  }
+  .grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin: 0 0 1.5rem;
+  }
+  .card h3, .card h4 { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+
+  /* ---- Badges ----------------------------------------------------------- */
+  .badge {
+    display: inline-flex; align-items: center; gap: .35em;
+    font-family: var(--font-mono);
+    font-size: .72rem; font-weight: 600;
+    letter-spacing: .02em;
+    padding: .16em .55em;
+    border-radius: 999px;
+    background: var(--accent-wash); color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    vertical-align: middle;
+  }
+  .badge--ok     { background: var(--ok-wash);     color: var(--ok);     border-color: color-mix(in srgb, var(--ok) 26%, transparent); }
+  .badge--warn   { background: var(--warn-wash);   color: var(--warn);   border-color: color-mix(in srgb, var(--warn) 26%, transparent); }
+  .badge--danger { background: var(--danger-wash); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+  .badge--muted  { background: transparent;        color: var(--muted);  border-color: var(--border-strong); }
+
+  /* ---- Callouts --------------------------------------------------------- */
+  .callout {
+    display: flex; gap: .8rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: .95rem 1.1rem;
+    margin: 0 0 1.5rem;
+  }
+  .callout__body { flex: 1; }
+  .callout__body > :last-child { margin-bottom: 0; }
+  .callout--ok     { border-left-color: var(--ok); }
+  .callout--warn   { border-left-color: var(--warn); }
+  .callout--danger { border-left-color: var(--danger); }
+  blockquote {
+    margin: 0 0 1.5rem;
+    padding: .2rem 0 .2rem 1.1rem;
+    border-left: 3px solid var(--border-strong);
+    color: var(--muted);
+    font-style: normal;
+  }
+
+  /* ---- Tables ----------------------------------------------------------- */
+  .table-scroll { overflow-x: auto; margin: 0 0 1.6rem; border-radius: var(--radius); }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .94rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  thead th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 700;
+    padding: .7rem .9rem;
+    border-bottom: 2px solid var(--border-strong);
+    white-space: nowrap;
+  }
+  tbody td { padding: .68rem .9rem; border-top: 1px solid var(--border); vertical-align: top; }
+  tbody tr:first-child td { border-top: none; }
+  tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
+  th:first-child, td:first-child { padding-left: 1.1rem; }
+
+  /* ---- Mermaid ---------------------------------------------------------- */
+  .mermaid {
+    margin: 0 0 1.6rem;
+    padding: 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  /* ---- Footer ----------------------------------------------------------- */
+  .foot {
+    margin-top: 3.5rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--faint);
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  }
+  .foot a { color: var(--faint); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .wrap > * { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="plate">
+      <span class="plate__mark" aria-hidden="true"></span>
+      <span class="plate__id">{{ARTIFACT_ID}}</span>
+      <span class="plate__sep">·</span>
+      <span>generated <time datetime="{{GENERATED_ISO}}">{{GENERATED_HUMAN}}</time></span>
+    </header>
+
+    <main>
+{{CONTENT}}
+    </main>
+
+    <footer class="foot">
+      <span>html-artifacts</span>
+      <span>{{ARTIFACT_ID}}</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -11,5 +11,8 @@ coverage.*
 /artifacts/*.html
 /artifacts/*.annotations.json
 
+# Generated project-local skill install (produced by ./install.sh --local)
+/.claude/
+
 # OS / editor cruft
 .DS_Store

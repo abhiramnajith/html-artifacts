@@ -91,9 +91,13 @@ fi
 TARGET="$SKILLS_ROOT/html-artifacts"
 
 mkdir -p "$TARGET"
-# Copy the thin adapter and the canonical CORE.md it defers to. Overwriting in
-# place keeps re-runs idempotent.
+# Copy the thin adapter, the canonical CORE.md it defers to, and the templates
+# (base.html + vendored mermaid.min.js) the agent needs at runtime. Overwriting
+# in place keeps re-runs idempotent; rm -rf the templates dir first so removed
+# files don't linger across updates.
 cp "$ADAPTER_DIR/SKILL.md" "$TARGET/SKILL.md"
 cp "$CORE" "$TARGET/CORE.md"
+rm -rf "$TARGET/templates"
+cp -R "$REPO_ROOT/instructions/templates" "$TARGET/templates"
 
 echo "installed html-artifacts adapter for '$AGENT' -> $TARGET"

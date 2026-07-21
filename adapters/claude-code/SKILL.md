@@ -1,11 +1,17 @@
 ---
 name: html-artifacts
-description: Placeholder — real auto-invocation description lands in Phase 1.
+description: Use when a deliverable is easier to grasp visually than as chat markdown — comparisons and "X vs Y" trade-off tables, phased plans and roadmaps, architecture/flow/sequence diagrams, structured reports and audits, or dense reference tables. Produces one self-contained, offline, light/dark HTML artifact in ./artifacts/ and opens it in the browser. Triggers on the shape of the deliverable, not on the words "artifact" or "HTML".
 ---
 
-# html-artifacts (Claude Code adapter)
+# html-artifacts
 
-> **Placeholder (Phase 0).** This adapter stays thin: frontmatter plus a
-> trigger description tuned for Claude Code's pattern-matching, with the body
-> deferring to `instructions/CORE.md`. All real logic lives in CORE.md — do not
-> duplicate it here.
+Produce a rich, self-contained **HTML artifact** instead of plain markdown when
+the user asks for something structured and visual.
+
+**All instructions live in `CORE.md`** (bundled next to this file). Read it and
+follow it exactly: when to produce an artifact, the output contract
+(`./artifacts/<id>.html` from `templates/base.html`), the content primitives,
+optional Mermaid diagrams, and how to open the result.
+
+Do not duplicate that logic here — this adapter only tells Claude Code when to
+reach for the skill; `CORE.md` is the source of truth for how.

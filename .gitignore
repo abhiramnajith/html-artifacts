@@ -1,0 +1,15 @@
+# Build output
+/bin/
+/server/bin/
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Runtime artifact/annotation data (never committed)
+/artifacts/*.html
+/artifacts/*.annotations.json
+
+# OS / editor cruft
+.DS_Store

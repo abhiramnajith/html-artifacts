@@ -390,42 +390,76 @@ git commit -m "feat: inject Mermaid runtime at view-time only for diagram artifa
 
 ---
 
-## Task 4: Slim base.html (drop inlined Mermaid) and update CORE.md
+## Task 4: Slim base.html, make the injected Mermaid bootstrap self-contained, and update CORE.md
+
+**Why the server owns init now:** Task 3 injects the Mermaid runtime just before
+`</body>`, which lands *after* any `mermaid.initialize()` script left in the
+template — so template-side init runs before the runtime loads and is a no-op
+(losing `securityLevel:'strict'` and the dark theme). Fix: the server injects the
+runtime **and** the init together, and the template drops the whole Mermaid block.
 
 **Files:**
-- Modify: `instructions/templates/base.html` (remove the runtime marker; keep `.mermaid` + init)
-- Modify: `instructions/CORE.md` (§4 remove inline step; note server supplies runtime)
+- Modify: `instructions/templates/base.html` (remove the entire `mermaid:begin…mermaid:end` block; keep only `.mermaid` divs authored in content)
+- Modify: `server/internal/server/server.go` (`mermaidTag` = runtime + themed strict init)
+- Modify: `server/internal/server/server_test.go` (assert the injected bootstrap includes init)
+- Modify: `instructions/CORE.md` (§4 remove inline step + fix stale `templates/vendor/mermaid.min.js` references; note the viewer supplies runtime+init)
 
-**Interfaces:** none (asset + docs).
+**Interfaces:** `mermaidTag` (server.go) becomes a multi-line const: runtime `<script src>` followed by an inline `mermaid.initialize` call.
 
-- [ ] **Step 1: Edit base.html**
+- [ ] **Step 1: Remove the Mermaid block from base.html**
 
-In the `mermaid:begin … mermaid:end` block, delete the runtime placeholder line:
+Delete the entire block from `<!-- mermaid:begin` through `<!-- mermaid:end -->` (both the runtime placeholder `<script>` and the `mermaid.initialize` `<script>`). Diagrams are authored as `<div class="mermaid">…</div>` in artifact content; the server now supplies both the runtime and the init at view-time. `</body></html>` immediately follows `</div>` (the `.wrap` close).
 
-```html
-  <script>/* mermaid:runtime — CORE.md inlines the vendored mermaid.min.js here */</script>
+- [ ] **Step 2: Make `mermaidTag` self-contained in server.go**
+
+Replace the `mermaidTag` const (currently just the `<script src>`):
+
+```go
+// mermaidTag loads the embedded Mermaid runtime and initializes it (strict
+// security, theme by prefers-color-scheme). Injected only when the artifact
+// contains a .mermaid block. Runtime first, then init, so init runs after the
+// runtime has defined window.mermaid.
+const mermaidTag = `<script src="/_vendor/mermaid.min.js"></script>
+<script>
+if (window.mermaid) {
+  var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  window.mermaid.initialize({ startOnLoad: true, securityLevel: 'strict', theme: dark ? 'dark' : 'neutral', fontFamily: 'ui-monospace, Menlo, monospace' });
+}
+</script>`
 ```
 
-Keep the `mermaid.initialize(...)` init `<script>` and the surrounding block. The template now carries no runtime; the server injects it.
+`injectAssets` already prepends `mermaidTag` before `shellTag` when a diagram is present — no other change needed there.
 
-- [ ] **Step 2: Edit CORE.md §4**
+- [ ] **Step 3: Strengthen the injection test**
 
-Replace the "Diagrams (Mermaid)" section body with: write each diagram as `<div class="mermaid">…</div>`; keep the init block; **do not inline anything** — the local viewer supplies the runtime automatically. Remove the Python inlining snippet. Add a one-line note: diagrams render through the viewer (auto-started), not a bare `file://` open.
+In `server_test.go`, extend `TestViewInjectsMermaidOnlyWithDiagram` (or add a case) so the diagram artifact body also asserts the init is injected, not just the runtime src:
 
-- [ ] **Step 3: Verify no template placeholders leak and a diagram artifact is small**
+```go
+	if !strings.Contains(withBody, "mermaid.initialize") || !strings.Contains(withBody, "securityLevel") {
+		t.Fatal("diagram artifact missing Mermaid init (strict/theme)")
+	}
+```
+
+- [ ] **Step 4: Edit CORE.md §4 and fix stale paths**
+
+Rewrite the "Diagrams (Mermaid)" section: author each diagram as `<div class="mermaid">…</div>`; **inline nothing** — the local viewer injects the runtime and initializes it (strict, themed) automatically. Delete the Python inlining snippet **and** any remaining references to `templates/vendor/mermaid.min.js` (the reviewer flagged CORE.md still points at that deleted path). Add a one-line note: diagrams render through the viewer (auto-started), not a bare `file://` open.
+
+- [ ] **Step 5: Verify**
 
 Run:
 ```bash
 cd /Users/abhiramnajith/Documents/claude-projects/html-artifacts
-grep -c 'mermaid:runtime' instructions/templates/base.html   # expect 0
+grep -c 'mermaid:runtime\|mermaid:begin' instructions/templates/base.html   # expect 0
+grep -c 'templates/vendor/mermaid' instructions/CORE.md                     # expect 0
+cd server && gofmt -l . && go vet ./... && go test ./internal/server/
 ```
-Expected: `0`.
+Expected: both greps `0`; gofmt clean; vet clean; server tests pass.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add instructions/
-git commit -m "refactor: template no longer inlines Mermaid; CORE.md updated"
+git add instructions/ server/internal/server/
+git commit -m "fix: server injects Mermaid runtime+init together; slim template; CORE.md"
 ```
 
 ---

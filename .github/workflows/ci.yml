@@ -90,3 +90,25 @@ jobs:
           out="html-artifacts-${{ matrix.goos }}-${{ matrix.goarch }}"
           gh release upload "${{ github.ref_name }}" "../$out" \
             --clobber --repo "${{ github.repository }}"
+
+  checksums:
+    name: publish checksums
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # This job never checks out the repo (it only downloads release assets),
+    # so override the workflow-level `working-directory: server` default —
+    # that directory doesn't exist on this runner.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release download "$tag" --repo "${{ github.repository }}" --pattern 'html-artifacts-*'
+          sha256sum html-artifacts-* > SHA256SUMS
+          gh release upload "$tag" SHA256SUMS --clobber --repo "${{ github.repository }}"

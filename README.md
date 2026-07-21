@@ -7,10 +7,11 @@ to annotate elements and feed changes back to the agent.
 
 Everything runs on `127.0.0.1`. No external hosting, no auth, no runtime dependencies.
 
-> **Status: v1 complete.** Instructions + template, the local viewer server, and
-> the annotation editor all work end-to-end. v1 ships the Claude Code adapter;
-> the `adapters/` layout is ready for others. Build notes live in
-> [`docs/PLAN.md`](docs/PLAN.md) and [`docs/design.md`](docs/design.md).
+> **Status: v1 complete**, now with a lightweight distribution path (Claude Code
+> plugin, agent-agnostic installer, a global artifact store, and a
+> lazily-fetched server binary — no `go install` or manual build required to get
+> started). Build notes live in [`docs/PLAN.md`](docs/PLAN.md) and
+> [`docs/design.md`](docs/design.md).
 
 ## How it works
 
@@ -27,6 +28,22 @@ Any agent that can read files and run shell commands can participate.
 
 ## Install
 
+There are two ways to install, depending on your agent.
+
+### Claude Code — via the plugin marketplace
+
+```
+/plugin marketplace add abhiramnajith/html-artifacts
+/plugin install html-artifacts
+```
+
+This installs the skill (instructions, template, and the `ensure-server.sh`
+bootstrap script) directly from this repo — no separate clone step needed.
+Restart your session (or reload the extension) afterwards so Claude Code picks
+up the new skill.
+
+### Any other agent (or Claude Code without the plugin) — via `install.sh`
+
 ```sh
 git clone https://github.com/abhiramnajith/html-artifacts
 cd html-artifacts
@@ -34,26 +51,18 @@ cd html-artifacts
 ./install.sh --agent claude --local  # or into ./.claude/skills/ (project-local)
 ```
 
-Re-running `install.sh` is idempotent. It makes no network calls beyond `git`.
+`install.sh` is agent-agnostic by design (`--agent codex|opencode|copilot`
+directories exist to prove the pattern; only `claude` ships real content in
+v1). It makes no network calls beyond `git`, and re-running it is idempotent.
+Pass `--with-binary` to eagerly fetch the server binary during install instead
+of waiting for first use.
 
-## Using it with your code editor (Claude Code)
+## Using it
 
-The skill installs into Claude Code's skills directory, so any Claude Code
-session — terminal, VS Code / JetBrains extension, or the desktop app — can use
-it. The flow is the same everywhere:
+Either install path gives Claude Code the same skill. The flow is the same
+everywhere:
 
-**1. Install the adapter and start the viewer.**
-
-```sh
-./install.sh --agent claude   # global: ~/.claude/skills/  (use --local for this repo only)
-make serve                    # viewer at http://127.0.0.1:7777  (leave running)
-```
-
-`make serve` runs the bundled Go binary. If you'd rather install it, `go install
-github.com/abhiramnajith/html-artifacts/server@latest` puts a `server` binary on
-your `$PATH`; run `server serve --port 7777 --dir ./artifacts`.
-
-**2. Ask for something visual — no need to name the skill.** In a Claude Code
+**1. Ask for something visual — no need to name the skill.** In an agent
 session opened in the project where you want the artifacts, just ask for the
 *shape* of a deliverable:
 
@@ -61,20 +70,25 @@ session opened in the project where you want the artifacts, just ask for the
 > "lay out a phased rollout plan for the migration"
 > "diagram the request lifecycle"
 
-The skill triggers on its own, writes a self-contained file to
-`./artifacts/<id>.html`, and opens it — at `http://127.0.0.1:7777/view/<id>` if
-the server is running, otherwise straight from the file.
+The skill triggers on its own, writes a self-contained file to the **global
+artifact store** at `~/.html-artifacts/artifacts/<id>.html`, and opens it. The
+first time it runs, `ensure-server.sh` transparently fetches the right release
+binary for your OS/arch (verified against the release's `SHA256SUMS`), starts
+it in the background on the first free port from **47600** up, and records
+that port so subsequent artifacts reuse the same server. The artifact opens at
+`http://127.0.0.1:<port>/view/<id>` if the server started successfully,
+otherwise straight from the file.
 
 > Auto-invocation is picked up when a session **starts**. If you just installed
 > the skill, open a fresh session (or restart the extension) so Claude Code
 > loads it.
 
-**3. Annotate in the browser.** On any `/view/<id>` page, click **✎ Annotate**
+**2. Annotate in the browser.** On any `/view/<id>` page, click **✎ Annotate**
 (bottom-right), then click an element or select text and leave a comment.
 Repeat, then hit **Send to agent** — that writes
-`./artifacts/<id>.annotations.json`.
+`~/.html-artifacts/artifacts/<id>.annotations.json`.
 
-**4. Ask the agent to apply your notes.** Back in your editor session:
+**3. Ask the agent to apply your notes.** Back in your editor session:
 
 > "apply the annotations for `<id>`"
 
@@ -94,12 +108,22 @@ and `adapters/copilot-cli` directories mark where thin per-agent adapters go
 
 ```sh
 make build     # builds the server binary into ./bin/
-make serve     # runs it on 127.0.0.1:7777  (override: make serve PORT=8080 DIR=./artifacts)
+make serve     # runs it on 127.0.0.1:47600, storing artifacts in ~/.html-artifacts/artifacts
+               # override: make serve PORT=8080 DIR=./some/other/dir
 make test      # go vet + go test
 ```
 
 Requires Go 1.23+. The server has zero third-party dependencies; the editor
-shell and index template are embedded in the binary.
+shell and index template are embedded in the binary. If you'd rather install
+the binary instead of building from a clone, `go install
+github.com/abhiramnajith/html-artifacts/server@latest` puts a binary named
+`server` (not `html-artifacts`) on your `$PATH`; run it with `server serve
+--port 47600 --dir ~/.html-artifacts/artifacts`.
+
+Prebuilt binaries for the current release (once one is cut) are attached to
+the corresponding [GitHub Release](https://github.com/abhiramnajith/html-artifacts/releases),
+alongside a `SHA256SUMS` file for verification — this is what `ensure-server.sh`
+downloads and checks automatically, so most users never need to fetch these by hand.
 
 ## License
 

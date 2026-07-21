@@ -13,7 +13,7 @@ read that once for context, then work from this file.
 - **Keep this file honest.** Tick the checkboxes as you complete them. Update "Current status" below.
 - **Never violate the Invariants** (next section), regardless of which phase you're in. If a task seems to require it, stop and flag it.
 
-**Current status:** _Phases 0–3 complete — the full v1 loop works. Annotation editor (element/text picker, comment popover, "Send to agent"), POST/GET `/annotations/{id}`, and CORE.md apply-rules (with prompt-injection guard). Verified end-to-end in the browser: annotate → send → JSON written → agent applied the change → artifact updated. Optional Phase 4 items remain (second adapter, session-start hook, diff view, export)._
+**Current status:** _Phases 0–3 complete — the full v1 loop works. Annotation editor (element/text picker, comment popover, "Send to agent"), POST/GET `/annotations/{id}`, and CORE.md apply-rules (with prompt-injection guard). Verified end-to-end in the browser: annotate → send → JSON written → agent applied the change → artifact updated. Phase 5 (lightweight distribution) is also complete — see below. Optional Phase 4 items remain (second adapter, session-start hook, diff view, export)._
 
 ---
 
@@ -102,6 +102,11 @@ beyond the design doc's prose — treat them as the default and adjust only with
 
 ### Files on disk (default `./artifacts/`)
 
+> **Superseded by Phase 5:** the default moved from the project-local
+> `./artifacts/` below to the global `~/.html-artifacts/artifacts/` (override
+> via `HTML_ARTIFACTS_DIR`). The path shape (`<id>.html` / `<id>.annotations.json`)
+> is unchanged — only the base directory did.
+
 - Artifact: `./artifacts/<id>.html` — one self-contained file, inline CSS/JS, **no CDN dependencies**.
 - Annotations: `./artifacts/<id>.annotations.json` — created/overwritten by the editor's "Send to agent".
 
@@ -184,6 +189,36 @@ beyond the design doc's prose — treat them as the default and adjust only with
 - [ ] Claude Code hook (SessionStart or polling MCP tool) surfacing pending annotations automatically.
 - [ ] Artifact diff view (before/after applying annotations).
 - [ ] Export to standalone HTML (strip editor shell) for manual sharing.
+
+### Phase 5 — Lightweight distribution & hardening (done)
+- [x] Claude Code plugin (`.claude-plugin/marketplace.json` + `plugin.json`) so
+      `/plugin marketplace add abhiramnajith/html-artifacts` + `/plugin install
+      html-artifacts` installs the skill without a manual `git clone`.
+- [x] `scripts/ensure-server.sh`: lazily resolves a server binary (`$PATH` →
+      local cache → GitHub release download, verified against the release's
+      `SHA256SUMS` → `go install` fallback), picks the first free port starting
+      at the new default **47600**, starts the server in the background, and
+      records the chosen port so repeat calls reuse the same instance.
+- [x] Moved the default artifact store off the project-local `./artifacts/` to
+      a **global** per-user store, `~/.html-artifacts/artifacts/` (override via
+      `HTML_ARTIFACTS_DIR`), so artifacts and the running server persist across
+      projects and sessions. `Makefile`'s `serve`/`DIR` default and `CORE.md`'s
+      output contract were updated to match.
+- [x] CI: added a `checksums` job (`.github/workflows/ci.yml`, `needs: release`)
+      that downloads the tagged release's `html-artifacts-*` binaries, computes
+      `sha256sum` over them into `SHA256SUMS`, and uploads it to the same
+      release with `gh release upload --clobber` — this is the file
+      `ensure-server.sh` verifies binary downloads against.
+- [x] `install.sh` gained `--with-binary` to eagerly fetch the server binary at
+      install time instead of waiting for first use.
+- [x] `README.md` updated to document both install paths (plugin vs.
+      `install.sh`), the global store, and the new default port.
+
+**Definition of done:** a user with neither a local clone nor Go installed can
+run `/plugin install html-artifacts` in Claude Code, ask for a visual
+deliverable, and have the binary, server, and artifact store all materialize
+automatically — verified against a published `SHA256SUMS` once a release
+exists.
 
 ---
 

@@ -23,6 +23,15 @@ Two limitations surfaced after v1:
 - Claude Code installs it natively via `/plugin`; every other agent installs via
   one agent-agnostic script. The server binary arrives automatically.
 
+## Added post-review
+
+- **`render` subcommand** — `html-artifacts render <path.md>` converts an
+  existing Markdown file (plan, spec, README, doc) into an artifact in the store
+  and prints its `/view/<id>` URL. Uses a small stdlib-only Markdown renderer and
+  the embedded `base.html`. Distinct from authoring new rich artifacts (§2–3 of
+  CORE.md): this makes *existing* Markdown viewable/annotatable. Motivated by the
+  gap that the tool could only author new HTML, never render an existing `.md`.
+
 ## Non-goals (deferred)
 
 - **`export` command** (produce a standalone, Mermaid-inlined HTML file for

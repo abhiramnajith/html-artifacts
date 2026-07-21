@@ -703,14 +703,17 @@ git commit -m "docs: CORE.md opens artifacts via ensure-server auto-start"
 In `Makefile`:
 
 ```make
-## sync: copy canonical CORE.md + ensure-server.sh into the plugin skill and adapters
+## sync: copy canonical CORE.md + ensure-server.sh + base.html into embed, plugin skill, and adapters
 sync:
-	mkdir -p skills/html-artifacts
+	mkdir -p skills/html-artifacts/templates adapters/claude-code/templates
 	cp instructions/CORE.md skills/html-artifacts/CORE.md
 	cp scripts/ensure-server.sh skills/html-artifacts/ensure-server.sh
 	cp adapters/claude-code/SKILL.md skills/html-artifacts/SKILL.md
+	cp instructions/templates/base.html skills/html-artifacts/templates/base.html
 	cp instructions/CORE.md adapters/claude-code/CORE.md
 	cp scripts/ensure-server.sh adapters/claude-code/ensure-server.sh
+	cp instructions/templates/base.html adapters/claude-code/templates/base.html
+	cp instructions/templates/base.html server/embed/base.html   # for the `render` subcommand's embedded template
 ```
 
 Update `serve` to reflect new defaults:
@@ -819,16 +822,20 @@ git commit -m "feat: Claude Code plugin manifest (marketplace + plugin)"
 
 - [ ] **Step 1: Update the copy section**
 
-In `install.sh`, replace the `templates/` copy with `ensure-server.sh`:
+In `install.sh`, add `ensure-server.sh`, and copy only `base.html` (not the old
+`templates/vendor/mermaid.min.js`, which no longer exists):
 
 ```sh
 cp "$ADAPTER_DIR/SKILL.md" "$TARGET/SKILL.md"
 cp "$CORE" "$TARGET/CORE.md"
 cp "$REPO_ROOT/scripts/ensure-server.sh" "$TARGET/ensure-server.sh"
 chmod +x "$TARGET/ensure-server.sh"
+mkdir -p "$TARGET/templates"
+cp "$REPO_ROOT/instructions/templates/base.html" "$TARGET/templates/base.html"
 ```
 
-Remove the `rm -rf "$TARGET/templates"` / `cp -R … templates` lines.
+Remove the old `rm -rf "$TARGET/templates"` / `cp -R … templates` lines (which
+copied the 3.4 MB Mermaid vendor dir). `base.html` alone is ~10 KB.
 
 - [ ] **Step 2: Add --with-binary flag**
 
@@ -901,7 +908,360 @@ git commit -m "ci+docs: publish SHA256SUMS; document plugin install, port, and s
 
 ---
 
-## Task 12: End-to-end verification and v0.1.0 release
+## Task 12: `render` subcommand — turn any Markdown file into an artifact
+
+Lets any existing Markdown deliverable (plans, specs, docs) become a viewable,
+annotatable artifact with a `/view/<id>` link — instead of a raw `.md` path.
+Stdlib-only Markdown renderer (no third-party deps).
+
+**Files:**
+- Create: `server/internal/markdown/markdown.go` + `markdown_test.go`
+- Move/embed: `server/embed/base.html` (synced from `instructions/templates/base.html`) added to `go:embed`
+- Modify: `server/main.go` (add `render` subcommand)
+- Test: `server/main_test.go`
+
+**Interfaces:**
+- Consumes: `storage.ValidID`, `defaultArtifactsDir()`, `assets.Files`.
+- Produces: `markdown.Render(md string) string` (HTML fragment); `func renderCmd(args []string) error`; CLI `html-artifacts render <path.md> [--title T] [--dir D] [--id ID]`.
+
+- [ ] **Step 1: Write the markdown renderer test**
+
+Create `server/internal/markdown/markdown_test.go`:
+
+```go
+package markdown
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestRenderBasics(t *testing.T) {
+	md := "# Title\n\nSome **bold** and `code`.\n\n- [ ] todo\n- [x] done\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n```go\nfmt.Println(\"hi\")\n```\n"
+	got := Render(md)
+	for _, want := range []string{
+		"<h1>Title</h1>",
+		"<strong>bold</strong>",
+		"<code>code</code>",
+		"<li>", "todo", "done",
+		"<div class=\"table-scroll\"><table>",
+		"<pre><code>", "fmt.Println",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("Render output missing %q\n---\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "<script") {
+		t.Fatal("Render must not emit raw <script>")
+	}
+}
+
+func TestRenderEscapesHTML(t *testing.T) {
+	got := Render("a <img src=x onerror=alert(1)> b")
+	if strings.Contains(got, "<img") {
+		t.Fatalf("HTML in markdown text must be escaped, got: %s", got)
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd server && go test ./internal/markdown/ -v`
+Expected: FAIL (package/`Render` undefined).
+
+- [ ] **Step 3: Implement the renderer**
+
+Create `server/internal/markdown/markdown.go`:
+
+```go
+// Package markdown is a tiny, dependency-free Markdown-to-HTML renderer for the
+// constructs used in project docs: headings, fenced code, inline code, GFM
+// tables, ordered/unordered lists (incl. task checkboxes), blockquotes,
+// horizontal rules, bold, and links. Output is plain semantic HTML styled by
+// base.html's element-level CSS. All text is HTML-escaped.
+package markdown
+
+import (
+	"fmt"
+	"html"
+	"regexp"
+	"strings"
+)
+
+var (
+	reHeading  = regexp.MustCompile(`^(#{1,4})\s+(.*)$`)
+	reHR       = regexp.MustCompile(`^---+\s*$`)
+	reList     = regexp.MustCompile(`^\s*([-*]|\d+\.)\s+`)
+	reOrdered  = regexp.MustCompile(`^\s*\d+\.\s+`)
+	reTask     = regexp.MustCompile(`^\[([ xX])\]\s+(.*)$`)
+	reInlCode  = regexp.MustCompile("`([^`]+)`")
+	reBold     = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	reLink     = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	reTableSep = regexp.MustCompile(`^\s*\|?[\s:|-]+\|?\s*$`)
+)
+
+func inlineFmt(s string) string {
+	s = html.EscapeString(s)
+	s = reInlCode.ReplaceAllString(s, "<code>$1</code>")
+	s = reBold.ReplaceAllString(s, "<strong>$1</strong>")
+	s = reLink.ReplaceAllString(s, `<a href="$2">$1</a>`)
+	return s
+}
+
+func cells(row string) []string {
+	row = strings.Trim(strings.TrimSpace(row), "|")
+	parts := strings.Split(row, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+// Render converts Markdown to an HTML fragment.
+func Render(md string) string {
+	lines := strings.Split(md, "\n")
+	var out, para []string
+	flush := func() {
+		if len(para) > 0 {
+			out = append(out, "<p>"+inlineFmt(strings.Join(para, " "))+"</p>")
+			para = nil
+		}
+	}
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		switch {
+		case strings.HasPrefix(line, "```"):
+			flush()
+			i++
+			var code []string
+			for i < len(lines) && !strings.HasPrefix(lines[i], "```") {
+				code = append(code, lines[i])
+				i++
+			}
+			out = append(out, "<pre><code>"+html.EscapeString(strings.Join(code, "\n"))+"</code></pre>")
+		case reHeading.MatchString(line):
+			flush()
+			m := reHeading.FindStringSubmatch(line)
+			lvl := len(m[1])
+			out = append(out, fmt.Sprintf("<h%d>%s</h%d>", lvl, inlineFmt(m[2]), lvl))
+		case reHR.MatchString(line):
+			flush()
+			out = append(out, "<hr>")
+		case strings.HasPrefix(strings.TrimSpace(line), "|") && i+1 < len(lines) && reTableSep.MatchString(lines[i+1]):
+			flush()
+			header := cells(line)
+			i += 2
+			var body [][]string
+			for i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "|") {
+				body = append(body, cells(lines[i]))
+				i++
+			}
+			i--
+			var b strings.Builder
+			b.WriteString(`<div class="table-scroll"><table><thead><tr>`)
+			for _, c := range header {
+				b.WriteString("<th>" + inlineFmt(c) + "</th>")
+			}
+			b.WriteString("</tr></thead><tbody>")
+			for _, row := range body {
+				b.WriteString("<tr>")
+				for _, c := range row {
+					b.WriteString("<td>" + inlineFmt(c) + "</td>")
+				}
+				b.WriteString("</tr>")
+			}
+			b.WriteString("</tbody></table></div>")
+			out = append(out, b.String())
+		case strings.HasPrefix(line, ">"):
+			flush()
+			var q []string
+			for i < len(lines) && strings.HasPrefix(lines[i], ">") {
+				q = append(q, strings.TrimSpace(strings.TrimPrefix(lines[i], ">")))
+				i++
+			}
+			i--
+			out = append(out, "<blockquote>"+inlineFmt(strings.Join(q, " "))+"</blockquote>")
+		case reList.MatchString(line):
+			flush()
+			ordered := reOrdered.MatchString(line)
+			var items []string
+			for i < len(lines) && reList.MatchString(lines[i]) {
+				item := reList.ReplaceAllString(lines[i], "")
+				if cb := reTask.FindStringSubmatch(item); cb != nil {
+					mark := "☐"
+					if strings.EqualFold(cb[1], "x") {
+						mark = "☑"
+					}
+					items = append(items, `<li><span class="badge badge--muted">`+mark+"</span> "+inlineFmt(cb[2])+"</li>")
+				} else {
+					items = append(items, "<li>"+inlineFmt(item)+"</li>")
+				}
+				i++
+			}
+			i--
+			tag := "ul"
+			if ordered {
+				tag = "ol"
+			}
+			out = append(out, "<"+tag+">"+strings.Join(items, "")+"</"+tag+">")
+		case strings.TrimSpace(line) == "":
+			flush()
+		default:
+			para = append(para, strings.TrimSpace(line))
+		}
+	}
+	flush()
+	return strings.Join(out, "\n")
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd server && go test ./internal/markdown/ -v`
+Expected: PASS.
+
+- [ ] **Step 5: Embed base.html and wire the render subcommand**
+
+Sync the template into the embed dir and add it to the embed list:
+
+```bash
+cp instructions/templates/base.html server/embed/base.html
+```
+
+In `server/embed/assets.go`:
+```go
+//go:embed shell.js index.html.tmpl mermaid.min.js base.html
+var Files embed.FS
+```
+
+In `server/main.go`, add the `render` case to `run`'s switch and the command:
+
+```go
+func slugify(s string) string {
+	s = strings.ToLower(s)
+	s = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(s, "-")
+	return strings.Trim(s, "-")
+}
+
+func renderCmd(args []string) error {
+	fs := flag.NewFlagSet("render", flag.ContinueOnError)
+	dir := fs.String("dir", defaultArtifactsDir(), "artifacts directory")
+	title := fs.String("title", "", "artifact title (defaults to the file name)")
+	idFlag := fs.String("id", "", "explicit artifact id (defaults to slug+timestamp)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() < 1 {
+		return fmt.Errorf("usage: html-artifacts render <path.md> [--title T] [--dir D] [--id ID]")
+	}
+	path := fs.Arg(0)
+	md, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	name := *title
+	if name == "" {
+		name = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+	id := *idFlag
+	if id == "" {
+		id = slugify(name) + "-" + time.Now().Format("20060102-150405")
+	}
+	if !storage.ValidID(id) {
+		return fmt.Errorf("invalid artifact id %q (must match ^[a-z0-9-]+$)", id)
+	}
+
+	tmpl, err := assets.Files.ReadFile("base.html")
+	if err != nil {
+		return fmt.Errorf("load template: %w", err)
+	}
+	now := time.Now()
+	out := string(tmpl)
+	repl := map[string]string{
+		"{{TITLE}}":           name,
+		"{{ARTIFACT_ID}}":     id,
+		"{{GENERATED_HUMAN}}": now.Format("02 Jan 2006, 15:04"),
+		"{{GENERATED_ISO}}":   now.Format("2006-01-02T15:04:05"),
+		"{{CONTENT}}":         markdown.Render(string(md)),
+	}
+	for k, v := range repl {
+		out = strings.ReplaceAll(out, k, v)
+	}
+
+	if err := os.MkdirAll(*dir, 0o700); err != nil {
+		return fmt.Errorf("create artifacts dir: %w", err)
+	}
+	dest := filepath.Join(*dir, id+".html")
+	if err := os.WriteFile(dest, []byte(out), 0o644); err != nil {
+		return fmt.Errorf("write artifact: %w", err)
+	}
+
+	fmt.Printf("rendered %s -> %s\n", path, dest)
+	if p, err := os.ReadFile(filepath.Join(homeDir(), ".html-artifacts", "port")); err == nil {
+		fmt.Printf("view: http://127.0.0.1:%s/view/%s\n", strings.TrimSpace(string(p)), id)
+	} else {
+		fmt.Printf("start the server (make serve) then open /view/%s\n", id)
+	}
+	return nil
+}
+
+func homeDir() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return h
+	}
+	return "."
+}
+```
+
+Add to the `run` switch: `case "render": return renderCmd(args[1:])`. Add imports `"path/filepath"`, `"regexp"`, `"time"`, `markdown "github.com/abhiramnajith/html-artifacts/server/internal/markdown"`, and `"github.com/abhiramnajith/html-artifacts/server/internal/storage"` (already imported). Update `usage()` to mention `render`.
+
+- [ ] **Step 6: Write the subcommand test**
+
+Add to `server/main_test.go`:
+
+```go
+func TestRenderCmdWritesArtifact(t *testing.T) {
+	dir := t.TempDir()
+	md := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(md, []byte("# Hello\n\nWorld **bold**.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderCmd([]string{"--dir", dir, md}); err != nil {
+		t.Fatalf("renderCmd: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, "note-*.html"))
+	if len(matches) != 1 {
+		t.Fatalf("expected one rendered artifact, got %v", matches)
+	}
+	body, _ := os.ReadFile(matches[0])
+	if !strings.Contains(string(body), "<h1>Hello</h1>") || !strings.Contains(string(body), "<strong>bold</strong>") {
+		t.Fatalf("rendered artifact missing converted content:\n%s", body)
+	}
+}
+```
+
+Add imports `"os"`, `"path/filepath"`, `"strings"` to `main_test.go` if missing.
+
+- [ ] **Step 7: Run tests to verify they pass**
+
+Run: `cd server && go test ./...`
+Expected: PASS (markdown + main + server + storage).
+
+- [ ] **Step 8: Update CORE.md with the render workflow**
+
+Add a short section to `instructions/CORE.md`: to view an **existing** Markdown/doc file (a plan, spec, README) as an artifact, run
+`html-artifacts render <path.md>` (via the bootstrapped binary) — it writes the artifact into the store and prints the `/view/<id>` URL; then open that URL. Distinguish from §2–3 (authoring *new* rich artifacts from the template).
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add server/internal/markdown/ server/embed/base.html server/embed/assets.go server/main.go server/main_test.go instructions/CORE.md
+git commit -m "feat: render subcommand turns Markdown files into artifacts"
+```
+
+---
+
+## Task 13: End-to-end verification and v0.1.0 release
 
 **Files:** none (verification + release).
 
@@ -918,6 +1278,10 @@ Expected: gofmt prints nothing; vet/test/shell test pass.
 - [ ] **Step 2: Browser E2E on a diagram artifact**
 
 Produce a diagram artifact into `~/.html-artifacts/artifacts`, auto-start via `scripts/ensure-server.sh`, open the printed `/view/<id>` URL, and confirm: the on-disk file is ~20 KB, the diagram renders (runtime injected), and the annotate → send → apply loop works against the global store.
+
+- [ ] **Step 2b: Verify the `render` subcommand end-to-end**
+
+Run `html-artifacts render docs/superpowers/plans/2026-07-22-lightweight-multi-agent-distribution.md`, confirm it prints a `/view/<id>` URL (server auto-started), open it, and confirm the plan renders with styled headings, tables, code blocks, and checkbox list items — and that the injected CSP header is present (`curl -sI <url> | grep -i content-security-policy`).
 
 - [ ] **Step 3: Push and confirm CI green**
 
@@ -943,7 +1307,8 @@ In a clean HOME, run `ensure-server.sh` with no local binary and confirm it down
 
 ## Self-Review
 
-- **Spec coverage:** Part A → Tasks 2,3,4,5; hardening → Task 1; Part B → Tasks 5,6,7; Part C → Tasks 8,9,10,11,12; deferred `export` correctly absent. ✔
+- **Spec coverage:** Part A → Tasks 2,3,4,5; hardening → Task 1; Part B → Tasks 5,6,7; Part C → Tasks 8,9,10,11,13; Markdown render/import (added post-review) → Task 12; deferred `export` correctly absent. ✔
+- **base.html distribution:** `make sync` (Task 8) copies it into `server/embed/` (render), the plugin skill, and adapters; `install.sh` (Task 10) copies `base.html` (not the removed Mermaid vendor). Consistent. ✔
 - **Security:** Findings 1 & 2 → Task 1 (Host/Origin middleware); Finding 3 → Task 3 (CSP on `/view`); Finding 4 → Tasks 5 & 6 (`0700` on the store); Finding 5 → accepted-risk note in Global Constraints; download integrity → checksum verification in Tasks 6 & 11. ✔
 - **Type consistency:** `injectShell` → `injectAssets` renamed consistently (Task 3 replaces the Task-in-v1 function and its only caller in `handleView`); `handleMermaid` route added in Task 1's mux and implemented in Task 2 (noted). ✔
 - **Placeholders:** none — all steps carry real code/commands. The only deferred verification is the plugin manifest field names (Task 9 Step 1), which is an explicit doc-check, not a placeholder. ✔

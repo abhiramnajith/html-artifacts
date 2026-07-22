@@ -3,14 +3,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	assets "github.com/abhiramnajith/vellum/server/embed"
@@ -50,6 +52,7 @@ func serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	port := fs.Int("port", 47600, "port to bind on 127.0.0.1")
 	dir := fs.String("dir", defaultArtifactsDir(), "directory holding artifacts and annotations")
+	idle := fs.Duration("idle-timeout", 0, "shut down after this long with no requests (0 = never)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -69,12 +72,16 @@ func serve(args []string) error {
 		return fmt.Errorf("listen on %s: %w", addr, err)
 	}
 
-	httpSrv := &http.Server{
-		Handler:           srv.Handler(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	// Shut down cleanly on Ctrl-C / SIGTERM (e.g. a `kill`, or the OS reaping
+	// the process), draining in-flight requests.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	fmt.Printf("vellum serving %s at http://%s/artifacts\n", *dir, addr)
-	if err := httpSrv.Serve(ln); err != nil {
+	if *idle > 0 {
+		fmt.Printf("idle shutdown after %s of inactivity\n", *idle)
+	}
+	if err := srv.Serve(ctx, ln, *idle); err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil

@@ -5,6 +5,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	assets "github.com/abhiramnajith/vellum/server/embed"
@@ -49,6 +51,9 @@ type AnnotationFile struct {
 type Server struct {
 	store *storage.Store
 	index *template.Template
+	// lastActivity is the Unix-nanos timestamp of the most recent request,
+	// used to drive idle shutdown.
+	lastActivity atomic.Int64
 }
 
 // New returns a Server backed by the given store, with the index template
@@ -58,7 +63,70 @@ func New(store *storage.Store) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse index template: %w", err)
 	}
-	return &Server{store: store, index: index}, nil
+	s := &Server{store: store, index: index}
+	s.lastActivity.Store(time.Now().UnixNano())
+	return s, nil
+}
+
+// Serve runs the HTTP server on ln until ctx is canceled (e.g. a shutdown
+// signal) or, when idle > 0, until no request has arrived for idle. It returns
+// nil on a clean shutdown, draining in-flight requests first (up to 5s).
+func (s *Server) Serve(ctx context.Context, ln net.Listener, idle time.Duration) error {
+	httpSrv := &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		s.awaitShutdown(ctx, idle)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = httpSrv.Shutdown(shutdownCtx)
+	}()
+
+	if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+// awaitShutdown blocks until ctx is done, or (when idle > 0) until the server
+// has gone at least idle without a request.
+func (s *Server) awaitShutdown(ctx context.Context, idle time.Duration) {
+	if idle <= 0 {
+		<-ctx.Done()
+		return
+	}
+	tick := idle / 4
+	if tick < 50*time.Millisecond {
+		tick = 50 * time.Millisecond
+	}
+	t := time.NewTicker(tick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if s.idleFor() >= idle {
+				return
+			}
+		}
+	}
+}
+
+// idleFor reports how long it has been since the last request.
+func (s *Server) idleFor() time.Duration {
+	return time.Since(time.Unix(0, s.lastActivity.Load()))
+}
+
+// trackActivity records the time of each request so idle shutdown can tell when
+// the server has gone quiet.
+func (s *Server) trackActivity(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.lastActivity.Store(time.Now().UnixNano())
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Handler returns the HTTP handler for all routes, wrapped so the server only
@@ -73,7 +141,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /_vendor/mermaid.min.js", s.handleMermaid)
 	mux.HandleFunc("POST /annotations/{id}", s.handlePostAnnotations)
 	mux.HandleFunc("GET /annotations/{id}", s.handleGetAnnotations)
-	return localhostOnly(mux)
+	return s.trackActivity(localhostOnly(mux))
 }
 
 func localhostOnly(next http.Handler) http.Handler {

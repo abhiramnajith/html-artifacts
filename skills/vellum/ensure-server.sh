@@ -9,8 +9,12 @@ HA_HOME="${VELLUM_HOME:-$HOME/.vellum}"
 BIN_DIR="$HA_HOME/bin"
 BIN="$BIN_DIR/vellum"
 PORT_FILE="$HA_HOME/port"
+LOCK="$HA_HOME/.startlock"
 DIR="${VELLUM_DIR:-$HA_HOME/artifacts}"
 START_PORT="${VELLUM_PORT:-47600}"
+# Auto-started servers reap themselves after this long with no requests, so a
+# forgotten background viewer does not linger forever. 0 = never idle-exit.
+IDLE="${VELLUM_IDLE_TIMEOUT:-30m}"
 mkdir -p "$BIN_DIR" "$DIR"
 chmod 700 "$HA_HOME" 2>/dev/null || true  # Finding 4: keep the global store private to this user
 
@@ -22,15 +26,32 @@ port_free() { # $1=port ; 0 if nothing is listening
   ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
 
-# 1. Already running on the recorded port?
-if [ -f "$PORT_FILE" ]; then
+# print_if_running: if the recorded port answers, print its URL and succeed.
+print_if_running() {
+  [ -f "$PORT_FILE" ] || return 1
   p="$(cat "$PORT_FILE")"
-  if [ -n "$p" ] && server_up "$p"; then
-    echo "http://127.0.0.1:$p"; exit 0
-  fi
-fi
+  [ -n "$p" ] && server_up "$p" || return 1
+  echo "http://127.0.0.1:$p"
+}
 
-# 2. Ensure a binary.
+# 1. Fast path (no lock): already running on the recorded port?
+if print_if_running; then exit 0; fi
+
+# 2. Serialize cold-start so two concurrent callers can't spawn duplicate
+#    servers on adjacent ports. mkdir is atomic; a stale lock (crashed starter)
+#    is stolen after ~5s so we never deadlock.
+i=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  i=$((i + 1))
+  if [ "$i" -ge 50 ]; then rm -rf "$LOCK" 2>/dev/null || true; i=0; fi
+  sleep 0.1
+done
+trap 'rm -rf "$LOCK" 2>/dev/null || true' EXIT INT TERM HUP
+
+# Another caller may have started the server while we waited for the lock.
+if print_if_running; then exit 0; fi
+
+# 3. Ensure a binary.
 resolve_bin() {
   if command -v vellum >/dev/null 2>&1; then echo "$(command -v vellum)"; return; fi
   if [ -x "$BIN" ]; then echo "$BIN"; return; fi
@@ -68,15 +89,17 @@ if [ -z "$BIN_PATH" ]; then
   exit 1
 fi
 
-# 3. Pick a free port.
+# 4. Pick a free port.
 port="$START_PORT"
 while ! port_free "$port"; do
   port=$((port + 1))
   [ "$port" -gt 65000 ] && { echo "no free port" >&2; exit 1; }
 done
 
-# 4. Start in the background, record the port, wait for readiness.
-nohup "$BIN_PATH" serve --port "$port" --dir "$DIR" >"$HA_HOME/server.log" 2>&1 &
+# 5. Start in the background, record the port, wait for readiness. The idle
+#    timeout lets a forgotten viewer reap itself; the lock (held until we exit)
+#    keeps a second caller from racing us here.
+nohup "$BIN_PATH" serve --port "$port" --dir "$DIR" --idle-timeout "$IDLE" >"$HA_HOME/server.log" 2>&1 &
 echo "$port" > "$PORT_FILE"
 for _ in $(seq 1 50); do
   server_up "$port" && { echo "http://127.0.0.1:$port"; exit 0; }

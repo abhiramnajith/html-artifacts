@@ -136,6 +136,19 @@ the one canonical [`instructions/CORE.md`](instructions/CORE.md) — see
 [`adapters/README.md`](adapters/README.md) for the pattern and how to add another
 agent.
 
+## Server lifecycle
+
+You never start or stop the server by hand. `ensure-server.sh` starts one shared
+viewer on demand (per `~/.vellum`) and every session reuses it via the recorded
+port. When it's auto-started this way it **reaps itself after 30 minutes with no
+requests** (`VELLUM_IDLE_TIMEOUT`), so a forgotten viewer never lingers — and it
+comes right back on the next artifact you open. Because it's shared, activity from
+*any* session resets that idle clock, so it won't vanish out from under a session
+that's still using it. Concurrent first-time starts are serialized with a lock, so
+two sessions can never spawn duplicate servers. `SIGTERM`/`Ctrl-C` shut it down
+gracefully. A manually run `vellum serve` (or `make serve`) never idle-exits
+(`--idle-timeout 0`) — it runs until you stop it.
+
 ## Build & run (from source)
 
 ```sh

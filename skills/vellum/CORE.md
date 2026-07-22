@@ -254,3 +254,34 @@ URL (or a reminder to start the server if it isn't running). Opening that URL
 requires the viewer to already be running (start it via `ensure-server.sh`,
 §5); open it as in §5 — the file behaves like any other artifact from then
 on, including annotations (§6).
+
+### When to render — a companion view for freshly-written docs
+
+**As soon as a spec, plan, design, or RFC-style Markdown deliverable has just
+been written or committed — proactively `render` it and give the user the
+`/view/<id>` URL** so they can read and review it in the viewer. Do this without
+being asked. The clearest trigger is a **review checkpoint**: when any workflow
+(e.g. a brainstorming or planning process) writes a doc to disk and then asks
+the user to review it, that review should happen against the rendered view.
+Typical files: `docs/**/specs/*.md`, `docs/**/plans/*.md`, design docs, RFCs.
+
+Two rules keep this correct:
+
+- **The committed Markdown file stays the source of truth.** The rendered
+  artifact is a *companion lens* for reading/reviewing and (optionally)
+  annotating — **never a replacement**. Do not move, rewrite, or delete the
+  source `.md`; do not treat the artifact as authoritative. If the user marks up
+  the rendered view (§6), apply the described changes back to the **source
+  `.md`**, then re-render.
+- **Render alongside a workflow, never in place of it.** If a process skill owns
+  the deliverable's flow (write the file, then proceed to the next step), let it;
+  the render is an extra, parallel view you offer at the review moment. It must
+  not hijack, reorder, or skip that workflow's own steps.
+
+Concretely, right after such a file is written:
+
+```sh
+BIN="$(command -v vellum || echo "$HOME/.vellum/bin/vellum")"
+"$BIN" render --title "<the doc's real title>" docs/superpowers/specs/<file>.md
+# then share the printed /view/<id> URL as the way to review it
+```

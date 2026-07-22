@@ -41,6 +41,11 @@ func safeURL(url string) bool {
 			return true
 		}
 	}
+	// Reject protocol-relative URLs (//host) — they inherit the current scheme
+	// and are an open-redirect/phishing vector, not a genuine local path.
+	if strings.HasPrefix(url, "//") {
+		return false
+	}
 	// Relative URLs: either rooted at "/" or containing no scheme separator
 	// at all. Anything with a ":" before the first "/" is treated as a
 	// scheme (javascript:, data:, vbscript:, etc.) and rejected.

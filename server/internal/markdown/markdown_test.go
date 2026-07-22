@@ -56,6 +56,21 @@ func TestRenderKeepsSafeLinks(t *testing.T) {
 	}
 }
 
+func TestRenderDropsProtocolRelativeLinks(t *testing.T) {
+	// //host is protocol-relative (inherits the current scheme) — an
+	// open-redirect/phishing vector. Drop it to plain text.
+	for _, in := range []string{"[x](//evil.com)", "[y](//evil.com/path)"} {
+		got := Render(in)
+		if strings.Contains(got, "<a href=") {
+			t.Fatalf("protocol-relative link was not dropped for %q: %s", in, got)
+		}
+	}
+	// A single-slash rooted path is still fine.
+	if got := Render("[ok](/local/path)"); !strings.Contains(got, `<a href="/local/path"`) {
+		t.Fatalf("rooted relative link was wrongly dropped: %s", got)
+	}
+}
+
 func TestRenderCodeSpanNotReprocessed(t *testing.T) {
 	got := Render("`**not bold**`")
 	if strings.Contains(got, "<strong>") {

@@ -272,7 +272,11 @@ func TestViewSetsRestrictiveCSP(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	csp := rec.Result().Header.Get("Content-Security-Policy")
-	if !strings.Contains(csp, "connect-src 'self'") {
-		t.Fatalf("view CSP missing connect-src 'self': %q", csp)
+	// connect-src blocks fetch/XHR exfil; form-action blocks form-POST exfil;
+	// frame-ancestors blocks clickjacking of the local viewer.
+	for _, want := range []string{"connect-src 'self'", "form-action 'self'", "frame-ancestors 'none'"} {
+		if !strings.Contains(csp, want) {
+			t.Fatalf("view CSP missing %q: %q", want, csp)
+		}
 	}
 }
